@@ -7,7 +7,6 @@
 
 import SwiftUI
 import AppKit
-import Cocoa
 
 @main
 struct jumperApp: App {
@@ -17,7 +16,6 @@ struct jumperApp: App {
         Settings {
             EmptyView()
         }
-        .windowRestorationClass(nil)
     }
 }
 
@@ -28,8 +26,9 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @Published public var soundEffectEnabled = true
     @Published public var visualEffectEnabled = true
 
-    // Store local monitor for key events
+    // Store monitors for key events
     private var localMonitor: Any?
+    private var globalMonitor: Any?
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         // Request accessibility permissions
@@ -48,6 +47,9 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
         // Initial screen setup
         updateScreens()
+
+        // Register keyboard shortcuts
+        registerKeyboardShortcuts()
     }
 
     private func requestAccessibilityPermissions() {
@@ -57,7 +59,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         if !accessEnabled {
             let alert = NSAlert()
             alert.messageText = "Accessibility Permissions Required"
-            alert.informativeText = "Jumper needs accessibility permissions to detect keyboard shortcuts. Please enable in System Settings > Privacy & Security > Accessibility."
+            alert.informativeText = "Jumper needs accessibility permissions to move the cursor. Please enable in System Settings > Privacy & Security > Accessibility."
             alert.alertStyle = .warning
             alert.addButton(withTitle: "Open Settings")
             alert.addButton(withTitle: "Later")
@@ -86,17 +88,14 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     public func updateScreens() {
-        // Unregister existing hotkeys
-        unregisterHotkeys()
-
         // Update screens array
         screens = NSScreen.screens
 
         // Update menu
         updateMenuItems()
 
-        // Register new hotkeys
-        registerHotkeys()
+        // Re-register keyboard shortcuts
+        registerKeyboardShortcuts()
     }
 
     private func updateMenuItems() {
@@ -198,7 +197,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         let centerX = screen.frame.origin.x + screen.frame.width / 2
         let centerY = screen.frame.origin.y + screen.frame.height / 2
 
-        // Move cursor
+        // Move cursor directly (without visual effect)
         CGWarpMouseCursorPosition(CGPoint(x: centerX, y: centerY))
 
         // Play sound if enabled
@@ -206,11 +205,11 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             NSSound.beep()
         }
 
-        // Show visual effect if enabled
-        if visualEffectEnabled {
-            showVisualEffect(at: CGPoint(x: centerX, y: centerY))
-        }
+        // Visual effect disabled to prevent memory issues
     }
+
+    // Store a reference to the effect window to prevent it from being deallocated
+    private var effectWindow: NSWindow?
 
     private func showVisualEffect(at point: CGPoint) {
         // Create a window for the visual effect
@@ -242,6 +241,9 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         visualEffectView.addSubview(circleView)
         window.contentView = visualEffectView
 
+        // Store a reference to the window
+        self.effectWindow = window
+
         window.orderFront(nil)
 
         // Animate the effect
@@ -249,8 +251,10 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             context.duration = 0.3
             circleView.layer?.opacity = 0
             circleView.layer?.setAffineTransform(CGAffineTransform(scaleX: 1.5, y: 1.5))
-        }, completionHandler: {
+        }, completionHandler: { [weak self] in
+            // Close the window and release the reference
             window.close()
+            self?.effectWindow = nil
         })
     }
 
@@ -294,41 +298,62 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     // MARK: - Keyboard Shortcuts
-    
-    private func registerHotkeys() {
-        // Unregister any existing monitors
-        unregisterHotkeys()
-        
-        // Create a local monitor for key events
+
+    private func registerKeyboardShortcuts() {
+        // Remove any existing monitors
+        unregisterKeyboardShortcuts()
+
+        // Create a global monitor for key events
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            _ = self?.handleKeyEvent(event)
+        }
+
+        // Create a local monitor for key events (when app is active)
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             guard let self = self else { return event }
-            
-            // Check if the event matches any of our registered shortcuts
-            for (index, _) in self.screens.enumerated() {
-                let shortcut = ShortcutManager.shared.getShortcut(for: index)
-                
-                // Check if modifiers match (Control+Shift)
-                if event.modifierFlags.contains(.control) && event.modifierFlags.contains(.shift) {
-                    // Check if keycode matches (1-9 keys)
-                    if event.keyCode == UInt16(shortcut.keyCode) {
-                        // Jump to the screen
-                        if index < self.screens.count {
-                            self.jumpCursorToScreen(self.screens[index])
-                            return nil // Consume the event
-                        }
-                    }
-                }
+
+            if self.handleKeyEvent(event) {
+                return nil // Consume the event
             }
-            
+
             return event // Pass the event through
         }
     }
-    
-    private func unregisterHotkeys() {
+
+    private func handleKeyEvent(_ event: NSEvent) -> Bool {
+        // Check if we have screens to jump to
+        guard !screens.isEmpty else { return false }
+
+        // Check if the event has Control+Shift modifiers
+        if event.modifierFlags.contains(.control) && event.modifierFlags.contains(.shift) {
+            // Check for number keys 1-9
+            let keyCode = event.keyCode
+            if keyCode >= 0x12 && keyCode <= 0x1B { // 1-9 keys
+                let screenIndex = Int(keyCode) - 0x12 // Convert to 0-based index
+
+                // Check if we have this screen
+                if screenIndex < screens.count {
+                    // Jump to screen directly
+                    jumpCursorToScreen(screens[screenIndex])
+                    return true
+                }
+            }
+        }
+
+        return false // Event was not handled
+    }
+
+    private func unregisterKeyboardShortcuts() {
         // Remove the local monitor
         if let localMonitor = localMonitor {
             NSEvent.removeMonitor(localMonitor)
             self.localMonitor = nil
+        }
+
+        // Remove the global monitor
+        if let globalMonitor = globalMonitor {
+            NSEvent.removeMonitor(globalMonitor)
+            self.globalMonitor = nil
         }
     }
 }
