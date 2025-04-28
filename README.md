@@ -1,7 +1,7 @@
-# Jumper
+# Jumper — Instantly Jump Across Your Displays
 
 <p align="center">
-  <img src="https://res.cloudinary.com/aliyaman/image/upload/v1745867505/vchfrlgjodzbr6age9au.png" alt="Jumper Screenshot"/>
+  <img src="https://res.cloudinary.com/aliyaman/image/upload/v1745867505/vchfrlgjodzbr6age9au.png" alt="Jumper Screenshot" height="500"/>
 </p>
 
 A lightweight macOS menu bar utility that lets you instantly move your cursor to the center of any connected display using keyboard shortcuts.
