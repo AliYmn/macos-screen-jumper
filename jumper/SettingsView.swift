@@ -172,7 +172,7 @@ struct SettingsView: View {
 
         // Get modifiers
         var modifiers: UInt32 = 0
-        
+
         if event.modifierFlags.contains(.control) {
             modifiers |= 1 // Control
         }

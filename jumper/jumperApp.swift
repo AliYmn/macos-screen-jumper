@@ -202,7 +202,8 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
         // Play sound if enabled
         if soundEffectEnabled {
-            NSSound.beep()
+            // Use a softer system sound instead of beep
+            NSSound(named: "Pop")?.play()
         }
 
         // Visual effect disabled to prevent memory issues
