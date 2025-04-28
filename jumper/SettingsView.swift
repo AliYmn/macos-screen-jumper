@@ -78,25 +78,13 @@ struct SettingsView: View {
                             .buttonStyle(.bordered)
                             .controlSize(.small)
 
-                            Button(action: {
-                                ShortcutManager.shared.resetToDefault(for: index)
-                                appDelegate.updateScreens() // Refresh shortcuts
-                            }) {
-                                Text("Reset")
-                                    .font(.system(size: 12))
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
+
                         }
                         .padding(.vertical, 4)
                     }
                 }
 
-                Button("Reset All to Default") {
-                    ShortcutManager.shared.resetAllToDefault()
-                    appDelegate.updateScreens() // Refresh shortcuts
-                }
-                .padding()
+
             }
             .tabItem {
                 Label("Shortcuts", systemImage: "keyboard")
@@ -105,22 +93,23 @@ struct SettingsView: View {
 
             // About Tab
             VStack(spacing: 20) {
-                Image(systemName: "arrow.up.and.down.and.arrow.left.and.right")
-                    .font(.system(size: 64))
-                    .foregroundColor(.blue)
-
                 Text("Jumper")
-                    .font(.largeTitle)
-                    .bold()
+                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .foregroundColor(.primary)
 
                 Text("Version 1.0")
-                    .font(.subheadline)
-
-                Text("A lightweight utility to jump your cursor between screens.")
+                    .font(.title3)
+                    .foregroundColor(.secondary)
+                
+                Text("A lightweight utility to jump your cursor between screens using keyboard shortcuts")
                     .font(.body)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
-
+                
+                Link("View on GitHub", destination: URL(string: "https://github.com/AliYmn/macos-jumper")!)
+                    .buttonStyle(BorderlessButtonStyle())
+                    .foregroundColor(.blue)
+                
                 Spacer()
 
                 Text("© 2025 Jumper App")

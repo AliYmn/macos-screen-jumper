@@ -113,6 +113,9 @@ public struct KeyboardShortcut: Codable, Equatable {
     }
 }
 
+// Kısayol değişikliklerini bildirmek için bildirim adı
+public let shortcutsChangedNotification = Notification.Name("JumperShortcutsChanged")
+
 public class ShortcutManager {
     public static let shared = ShortcutManager()
 
@@ -137,16 +140,33 @@ public class ShortcutManager {
     public func setShortcut(_ shortcut: KeyboardShortcut, for screenIndex: Int) {
         shortcuts[screenIndex] = shortcut
         saveShortcuts()
+        
+        // Kısayol değişikliğini bildir
+        NotificationCenter.default.post(name: shortcutsChangedNotification, object: nil)
     }
 
     public func resetToDefault(for screenIndex: Int) {
         shortcuts[screenIndex] = KeyboardShortcut.defaultShortcut(for: screenIndex)
         saveShortcuts()
+        
+        // Kısayol değişikliğini bildir
+        NotificationCenter.default.post(name: shortcutsChangedNotification, object: nil)
     }
 
-    public func resetAllToDefault() {
+    public func resetAllShortcuts() {
+        // Tüm kısayolları temizle
         shortcuts.removeAll()
+        
+        // Mevcut ekran sayısına göre varsayılan kısayolları ayarla
+        let screenCount = NSScreen.screens.count
+        for i in 0..<screenCount {
+            shortcuts[i] = KeyboardShortcut.defaultShortcut(for: i)
+        }
+        
         saveShortcuts()
+        
+        // Kısayol değişikliğini bildir
+        NotificationCenter.default.post(name: shortcutsChangedNotification, object: nil)
     }
 
     private func loadShortcuts() {

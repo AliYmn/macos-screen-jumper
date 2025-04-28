@@ -1,7 +1,6 @@
 # Jumper - macOS Menu Bar App
-
 <p align="center">
-  <img src="https://res.cloudinary.com/aliyaman/image/upload/v1745861313/cfmvyawq3ovad84cjsde.png" alt="Jumper Screenshot" height="300" />
+  <img src="https://res.cloudinary.com/aliyaman/image/upload/v1745865959/u9rwn2rjqulbgl78mkkg.png" alt="Jumper Screenshot"/>
 </p>
 
 
@@ -18,6 +17,16 @@ Jumper is a lightweight macOS menu bar application that enables users to instant
 - **Low Resource Usage**: Minimal CPU and memory footprint
 - **Launch at Login**: Option to start automatically when you log in
 - **Dynamic Screen Detection**: Automatically adapts when screens are connected or disconnected
+
+
+
+<p align="center">
+  <img src="https://res.cloudinary.com/aliyaman/image/upload/v1745865489/il0ktfmtocr5pyu7ico2.png" alt="Jumper Screenshot" height="300" />
+</p>
+
+<p align="center">
+  <img src="https://res.cloudinary.com/aliyaman/image/upload/v1745865544/wlucueavub3phg9gcdtk.png" alt="Jumper Screenshot" height="300" />
+</p>
 
 ## Usage
 

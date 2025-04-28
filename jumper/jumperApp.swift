@@ -26,16 +26,31 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @Published public var soundEffectEnabled = true
     @Published public var visualEffectEnabled = true
 
+    // Pre-created sound object for sound effect
+    private var popSound: NSSound?
+    
+    // Settings window controller
+    private var settingsWindowController: SettingsWindowController?
+
     // Store monitors for key events
     private var localMonitor: Any?
     private var globalMonitor: Any?
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        // Hide from Dock
+        NSApp.setActivationPolicy(.accessory)
+
         // Request accessibility permissions
         requestAccessibilityPermissions()
 
         // Setup menu bar item
         setupMenuBar()
+
+        // Initial screen setup
+        updateScreens()
+
+        // Pre-create sound object
+        popSound = NSSound(named: "Pop")
 
         // Register for screen change notifications
         NotificationCenter.default.addObserver(
@@ -45,11 +60,21 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             object: nil
         )
 
-        // Initial screen setup
-        updateScreens()
+        // Listen for shortcut changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(shortcutsDidChange),
+            name: shortcutsChangedNotification,
+            object: nil
+        )
 
         // Register keyboard shortcuts
         registerKeyboardShortcuts()
+
+        // Ensure menu bar item is visible
+        DispatchQueue.main.async {
+            self.setupMenuBar()
+        }
     }
 
     private func requestAccessibilityPermissions() {
@@ -72,10 +97,13 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     private func setupMenuBar() {
+        // Create an item in the menu bar
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "arrow.up.and.down.and.arrow.left.and.right", accessibilityDescription: "Jumper")
+            // Mouse and jump themed icon
+            button.image = NSImage(systemSymbolName: "cursorarrow.rays", accessibilityDescription: "Jumper")
+            button.imagePosition = .imageLeft
         }
 
         statusBarMenu = NSMenu()
@@ -85,6 +113,29 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     @objc private func screensDidChange() {
         updateScreens()
+    }
+    
+    @objc private func shortcutsDidChange(_ notification: Notification) {
+        // Apply shortcut changes
+        updateMenuItems() // Update menu
+        registerKeyboardShortcuts() // Re-register keyboard shortcuts
+    }
+    
+    @objc private func openSettings() {
+        if settingsWindowController == nil {
+            settingsWindowController = SettingsWindowController(appDelegate: self)
+        }
+        
+        settingsWindowController?.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    @objc private func refreshScreens() {
+        updateScreens()
+    }
+    
+    @objc private func quitApp() {
+        NSApp.terminate(nil)
     }
 
     public func updateScreens() {
@@ -121,11 +172,11 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             let menuItem = NSMenuItem(
                 title: "\(screenType) (\(resolution))",
                 action: #selector(jumpToScreen(_:)),
-                keyEquivalent: index < 9 ? "\(index + 1)" : ""
+                keyEquivalent: shortcut.keyEquivalent
             )
 
-            // Set Command as the modifier
-            menuItem.keyEquivalentModifierMask = .command
+            // Set the actual shortcut modifiers
+            menuItem.keyEquivalentModifierMask = shortcut.modifierMask
             menuItem.tag = index
             menuItem.image = icon
             statusBarMenu.addItem(menuItem)
@@ -134,17 +185,17 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         statusBarMenu.addItem(NSMenuItem.separator())
 
         // Settings
-        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: "")
         statusBarMenu.addItem(settingsItem)
 
         // Refresh screens
-        let refreshItem = NSMenuItem(title: "Refresh Screens", action: #selector(refreshScreens), keyEquivalent: "r")
+        let refreshItem = NSMenuItem(title: "Refresh Screens", action: #selector(refreshScreens), keyEquivalent: "")
         statusBarMenu.addItem(refreshItem)
 
         statusBarMenu.addItem(NSMenuItem.separator())
 
         // Quit
-        let quitItem = NSMenuItem(title: "Quit Jumper", action: #selector(quitApp), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: "Quit Jumper", action: #selector(quitApp), keyEquivalent: "")
         statusBarMenu.addItem(quitItem)
     }
 
@@ -159,31 +210,8 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     private func getScreenType(_ screen: NSScreen) -> String {
-        let name = screen.localizedName.lowercased()
-        let width = screen.frame.width
-        let height = screen.frame.height
-        let aspectRatio = width / height
-
-        // Detect screen type based on name and dimensions
-        if name.contains("macbook") || name.contains("built-in") {
-            return "MacBook"
-        } else if name.contains("lg") && name.contains("ultrafine") {
-            return "LG UltraFine"
-        } else if name.contains("dell") {
-            if aspectRatio < 0.8 {
-                return "Dell Portrait"
-            } else {
-                return "Dell Monitor"
-            }
-        } else if aspectRatio < 0.8 {
-            return "Portrait Monitor"
-        } else if aspectRatio > 2.0 {
-            return "Ultrawide Monitor"
-        } else if min(width, height) < 900 && aspectRatio.rounded(to: 1) == 1.3 {
-            return "Tablet"
-        } else {
-            return "Monitor"
-        }
+        // Use screen name directly
+        return screen.localizedName
     }
 
     private func getScreenEmoji(_ screen: NSScreen) -> String {
@@ -268,146 +296,21 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
         // Play sound if enabled
         if soundEffectEnabled {
-            // Use a softer system sound instead of beep
-            NSSound(named: "Pop")?.play()
+            // Create sound object if needed or use existing one
+            if popSound == nil {
+                popSound = NSSound(named: "Pop")
+            }
+            
+            // If sound is playing, stop it and restart
+            if let sound = popSound {
+                if sound.isPlaying {
+                    sound.stop()
+                }
+                sound.play()
+            }
         }
 
         // Visual effect disabled to prevent memory issues
-    }
-
-    // Store a reference to the effect window to prevent it from being deallocated
-    private var effectWindow: NSWindow?
-
-    private func showVisualEffect(at point: CGPoint) {
-        // Create a window for the visual effect
-        let window = NSWindow(
-            contentRect: NSRect(x: point.x - 50, y: point.y - 50, width: 100, height: 100),
-            styleMask: .borderless,
-            backing: .buffered,
-            defer: false
-        )
-
-        window.backgroundColor = .clear
-        window.isOpaque = false
-        window.level = .floating
-        window.ignoresMouseEvents = true
-
-        // Create the visual effect view
-        let visualEffectView = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: 100, height: 100))
-        visualEffectView.material = .hudWindow
-        visualEffectView.state = .active
-        visualEffectView.wantsLayer = true
-        visualEffectView.layer?.cornerRadius = 50
-
-        // Add a circle shape
-        let circleView = NSView(frame: NSRect(x: 10, y: 10, width: 80, height: 80))
-        circleView.wantsLayer = true
-        circleView.layer?.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.5).cgColor
-        circleView.layer?.cornerRadius = 40
-
-        visualEffectView.addSubview(circleView)
-        window.contentView = visualEffectView
-
-        // Store a reference to the window
-        self.effectWindow = window
-
-        window.orderFront(nil)
-
-        // Animate the effect
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.3
-            circleView.layer?.opacity = 0
-            circleView.layer?.setAffineTransform(CGAffineTransform(scaleX: 1.5, y: 1.5))
-        }, completionHandler: { [weak self] in
-            // Close the window and release the reference
-            window.close()
-            self?.effectWindow = nil
-        })
-    }
-
-    private var settingsWindowController: SettingsWindowController?
-
-    @objc private func openSettings() {
-        if settingsWindowController == nil {
-            settingsWindowController = SettingsWindowController(appDelegate: self)
-        }
-
-        settingsWindowController?.window?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
-    @objc private func toggleSound(_ sender: NSButton) {
-        soundEffectEnabled = sender.state == .on
-    }
-
-    @objc private func toggleVisual(_ sender: NSButton) {
-        visualEffectEnabled = sender.state == .on
-    }
-
-    @objc private func toggleLaunchAtLogin(_ sender: NSButton) {
-        setLaunchAtLogin(enabled: sender.state == .on)
-    }
-
-    private func isLaunchAtLoginEnabled() -> Bool {
-        return LaunchAtLogin.shared.isEnabled()
-    }
-
-    private func setLaunchAtLogin(enabled: Bool) {
-        LaunchAtLogin.shared.setEnabled(enabled)
-    }
-
-    @objc private func refreshScreens() {
-        updateScreens()
-    }
-
-    @objc private func quitApp() {
-        NSApp.terminate(nil)
-    }
-
-    // MARK: - Keyboard Shortcuts
-
-    private func registerKeyboardShortcuts() {
-        // Remove any existing monitors
-        unregisterKeyboardShortcuts()
-
-        // Create a global monitor for key events
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            _ = self?.handleKeyEvent(event)
-        }
-
-        // Create a local monitor for key events (when app is active)
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-            guard let self = self else { return event }
-
-            if self.handleKeyEvent(event) {
-                return nil // Consume the event
-            }
-
-            return event // Pass the event through
-        }
-    }
-
-    private func handleKeyEvent(_ event: NSEvent) -> Bool {
-        // Check if we have screens to jump to
-        guard !screens.isEmpty else { return false }
-
-        // Check if the event has Control+Shift modifiers
-        if event.modifierFlags.contains(.control) && event.modifierFlags.contains(.shift) {
-            // Check for number keys 1-9
-            let keyCode = event.keyCode
-            if keyCode >= 0x12 && keyCode <= 0x1B { // 1-9 keys
-                let screenIndex = Int(keyCode) - 0x12 // Convert to 0-based index
-
-                // Check if we have this screen
-                if screenIndex < screens.count {
-                    // Jump to screen directly
-                    jumpCursorToScreen(screens[screenIndex])
-                    return true
-                }
-            }
-        }
-
-        return false // Event was not handled
     }
 
     private func unregisterKeyboardShortcuts() {
@@ -422,6 +325,48 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             NSEvent.removeMonitor(globalMonitor)
             self.globalMonitor = nil
         }
+    }
+    
+    private func registerKeyboardShortcuts() {
+        // Remove any existing monitors
+        unregisterKeyboardShortcuts()
+        
+        // Create a global monitor for key events
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            _ = self?.handleKeyEvent(event)
+        }
+        
+        // Create a local monitor for key events (when app is active)
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+            guard let self = self else { return event }
+            
+            if self.handleKeyEvent(event) {
+                return nil // Consume the event
+            }
+            
+            return event // Pass the event through
+        }
+    }
+    
+    private func handleKeyEvent(_ event: NSEvent) -> Bool {
+        // Check if we have screens to jump to
+        guard !screens.isEmpty else { return false }
+        
+        // Check all screens
+        for (index, screen) in screens.enumerated() {
+            // Get the shortcut defined for this screen
+            let shortcut = ShortcutManager.shared.getShortcut(for: index)
+            
+            // Check if the shortcut keys and modifiers match
+            if event.keyCode == shortcut.keyCode && 
+               event.modifierFlags.contains(shortcut.modifierMask) {
+                // Match found, move cursor to this screen
+                jumpCursorToScreen(screen)
+                return true
+            }
+        }
+        
+        return false // Event was not handled
     }
 }
 
