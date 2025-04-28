@@ -79,10 +79,10 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             name: LaunchAtLogin.statusChangedNotification,
             object: nil
         )
-        
+
         // Register app to receive background events
         NSApplication.shared.setActivationPolicy(.accessory)
-        
+
         // Register keyboard shortcuts
         registerKeyboardShortcuts()
 
@@ -366,84 +366,84 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             }
         }
     }
-
-    // Show an elegant visual effect at the cursor position
+    
+    // Show a quick jump effect at the cursor position
     private func showLightVisualEffect(at point: CGPoint) {
-        // Create outer ring
-        let ringSize: CGFloat = 50
-        let ringPanel = NSPanel(
-            contentRect: NSRect(x: point.x - ringSize/2, y: point.y - ringSize/2, width: ringSize, height: ringSize),
+        // Create a simple circular highlight
+        let highlightSize: CGFloat = 60 // Large enough to be visible but not distracting
+        let highlightPanel = NSPanel(
+            contentRect: NSRect(x: point.x - highlightSize/2, y: point.y - highlightSize/2, width: highlightSize, height: highlightSize),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
 
-        // Configure the ring panel
-        ringPanel.backgroundColor = .clear
-        ringPanel.isOpaque = false
-        ringPanel.hasShadow = false
-        ringPanel.level = .popUpMenu
-        ringPanel.ignoresMouseEvents = true
+        // Configure the panel
+        highlightPanel.backgroundColor = .clear
+        highlightPanel.isOpaque = false
+        highlightPanel.hasShadow = false
+        highlightPanel.level = .popUpMenu
+        highlightPanel.ignoresMouseEvents = true
+        highlightPanel.alphaValue = 0.0
 
-        // Create a custom view for the ring
-        let ringView = NSView(frame: NSRect(x: 0, y: 0, width: ringSize, height: ringSize))
-        ringView.wantsLayer = true
+        // Create a custom view for the highlight
+        let highlightView = NSView(frame: NSRect(x: 0, y: 0, width: highlightSize, height: highlightSize))
+        highlightView.wantsLayer = true
 
-        // Create the ring shape
+        // Create the outer ring
         let ringLayer = CAShapeLayer()
-        let ringPath = NSBezierPath(ovalIn: NSRect(x: 2, y: 2, width: ringSize-4, height: ringSize-4))
+        let ringPath = NSBezierPath(ovalIn: NSRect(x: 2, y: 2, width: highlightSize-4, height: highlightSize-4))
         ringLayer.path = ringPath.cgPath
         ringLayer.fillColor = NSColor.clear.cgColor
         ringLayer.strokeColor = NSColor.systemBlue.cgColor
-        ringLayer.lineWidth = 2.0
-        ringLayer.opacity = 0.7
+        ringLayer.lineWidth = 2.5
+        ringLayer.opacity = 0.8
+        
+        // Create the center dot
+        let dotLayer = CAShapeLayer()
+        let dotSize: CGFloat = 12 // Small dot in the center
+        let dotPath = NSBezierPath(ovalIn: NSRect(x: (highlightSize-dotSize)/2, y: (highlightSize-dotSize)/2, width: dotSize, height: dotSize))
+        dotLayer.path = dotPath.cgPath
+        dotLayer.fillColor = NSColor.systemBlue.cgColor
+        dotLayer.opacity = 0.9
 
-        // Add the ring layer
-        ringView.layer?.addSublayer(ringLayer)
-        ringPanel.contentView = ringView
+        // Add the layers
+        highlightView.layer?.addSublayer(ringLayer)
+        highlightView.layer?.addSublayer(dotLayer)
+        highlightPanel.contentView = highlightView
 
-        // Create inner dot
-        let dotSize: CGFloat = 20
-        let dotPanel = NSPanel(
-            contentRect: NSRect(x: point.x - dotSize/2, y: point.y - dotSize/2, width: dotSize, height: dotSize),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
+        // Show the panel
+        highlightPanel.orderFront(nil)
 
-        // Configure the dot panel
-        dotPanel.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.4)
-        dotPanel.isOpaque = false
-        dotPanel.hasShadow = false
-        dotPanel.level = .popUpMenu
-        dotPanel.ignoresMouseEvents = true
+        // Quick pulse animation
+        let pulseAnimation = CABasicAnimation(keyPath: "transform.scale")
+        pulseAnimation.duration = 0.25
+        pulseAnimation.fromValue = 0.7
+        pulseAnimation.toValue = 1.1
+        pulseAnimation.autoreverses = true
+        pulseAnimation.repeatCount = 1
+        ringLayer.add(pulseAnimation, forKey: "pulse")
+        
+        // Dot animation (slightly delayed)
+        let dotAnimation = CABasicAnimation(keyPath: "opacity")
+        dotAnimation.duration = 0.2
+        dotAnimation.fromValue = 1.0
+        dotAnimation.toValue = 0.0
+        dotAnimation.beginTime = CACurrentMediaTime() + 0.1
+        dotLayer.add(dotAnimation, forKey: "fade")
 
-        // Make the dot round
-        dotPanel.contentView?.wantsLayer = true
-        dotPanel.contentView?.layer?.cornerRadius = dotSize/2
-
-        // Show both panels
-        ringPanel.orderFront(nil)
-        dotPanel.orderFront(nil)
-
-        // Simple fade-in effect
-        ringPanel.alphaValue = 0.0
-        dotPanel.alphaValue = 0.0
-
+        // Quick fade-in and fade-out animation
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.15
-            ringPanel.animator().alphaValue = 1.0
-            dotPanel.animator().alphaValue = 1.0
+            context.duration = 0.15 // Fast fade-in
+            highlightPanel.animator().alphaValue = 1.0
         }) {
-            // Fade-out and close
+            // Quick fade-out
             NSAnimationContext.runAnimationGroup({ context in
-                context.duration = 0.15
-                ringPanel.animator().alphaValue = 0.0
-                dotPanel.animator().alphaValue = 0.0
+                context.duration = 0.25 // Quick fade-out
+                highlightPanel.animator().alphaValue = 0.0
             }) {
-                // Close panels
-                ringPanel.close()
-                dotPanel.close()
+                // Close panel
+                highlightPanel.close()
             }
         }
     }
@@ -465,22 +465,22 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private func registerKeyboardShortcuts() {
         // Remove any existing monitors
         unregisterKeyboardShortcuts()
-        
+
         // Register app to receive keyboard events in the background
         // Only check permissions, don't show alerts (already shown in requestAccessibilityPermissions)
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] // Don't show prompt automatically
         let accessEnabled = AXIsProcessTrustedWithOptions(options as CFDictionary)
-        
+
         // Just print debug information
         if !accessEnabled {
             print("Accessibility permissions not granted. Global shortcuts may not work.")
         }
-        
+
         // Create a global monitor for key events that works even when app isn't active
         // Use flags to ensure we capture all key combinations
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
             guard let self = self else { return }
-            
+
             // Only process keyDown events
             if event.type == .keyDown {
                 print("Global key event detected: \(event.keyCode) with modifiers: \(event.modifierFlags.rawValue)")
@@ -491,7 +491,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // Create a local monitor for key events (when app is active)
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
             guard let self = self else { return event }
-            
+
             // Only process keyDown events
             if event.type == .keyDown {
                 print("Local key event detected: \(event.keyCode) with modifiers: \(event.modifierFlags.rawValue)")
@@ -499,17 +499,17 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     return nil // Consume the event
                 }
             }
-            
+
             return event // Pass the event through
         }
-        
+
         print("Keyboard shortcuts registered. Global monitor: \(String(describing: globalMonitor)), Local monitor: \(String(describing: localMonitor))")
     }
 
     private func handleKeyEvent(_ event: NSEvent) -> Bool {
         // Check if we have screens to jump to
         guard !screens.isEmpty else { return false }
-        
+
         // Debug info
         print("Handling key event: keyCode=\(event.keyCode), modifiers=\(event.modifierFlags.rawValue)")
 
@@ -517,7 +517,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         for (index, screen) in screens.enumerated() {
             // Get the shortcut defined for this screen
             let shortcut = ShortcutManager.shared.getShortcut(for: index)
-            
+
             // Debug info for this shortcut
             print("Checking shortcut for screen \(index): keyCode=\(shortcut.keyCode), modifiers=\(shortcut.modifiers)")
 
@@ -526,9 +526,9 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 // Check if the modifiers match (more lenient matching)
                 let requiredModifiers = shortcut.modifierMask
                 let eventModifiers = event.modifierFlags.intersection([.shift, .control, .option, .command])
-                
+
                 print("Required modifiers: \(requiredModifiers), Event modifiers: \(eventModifiers)")
-                
+
                 // Check if all required modifiers are present
                 if eventModifiers == requiredModifiers {
                     print("Shortcut matched! Moving cursor to screen \(index)")

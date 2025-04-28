@@ -1,7 +1,7 @@
 # Jumper — Instantly Jump Across Your Displays
 
 <p align="center">
-  <img src="https://res.cloudinary.com/aliyaman/image/upload/v1745867505/vchfrlgjodzbr6age9au.png" alt="Jumper Screenshot" height="500"/>
+  <img src="https://res.cloudinary.com/aliyaman/image/upload/v1745871118/blag3l6tj4yjlq2x3v7y.png" alt="Jumper Screenshot" height="400"/>
 </p>
 
 A lightweight macOS menu bar utility that lets you instantly move your cursor to the center of any connected display using keyboard shortcuts.
@@ -17,7 +17,7 @@ A lightweight macOS menu bar utility that lets you instantly move your cursor to
 - **Convenient**: Option to start automatically at login
 
 <p align="center">
-  <img src="https://res.cloudinary.com/aliyaman/image/upload/v1745865489/il0ktfmtocr5pyu7ico2.png" alt="Jumper Settings" height="300" />
+  <img src="https://res.cloudinary.com/aliyaman/image/upload/v1745865489/il0ktfmtocr5pyu7ico2.png" alt="Jumper Settings" height="400" />
 </p>
 
 ## Usage
@@ -35,7 +35,7 @@ Access settings through the menu bar icon:
 - **About**: View version information and links
 
 <p align="center">
-  <img src="https://res.cloudinary.com/aliyaman/image/upload/v1745865544/wlucueavub3phg9gcdtk.png" alt="Jumper Shortcuts" height="300" />
+  <img src="https://res.cloudinary.com/aliyaman/image/upload/v1745865544/wlucueavub3phg9gcdtk.png" alt="Jumper Shortcuts" height="400" />
 </p>
 
 ## Requirements
