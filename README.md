@@ -1,5 +1,10 @@
 # Jumper - macOS Menu Bar App
 
+<p align="center">
+  <img src="https://res.cloudinary.com/aliyaman/image/upload/v1745861313/cfmvyawq3ovad84cjsde.png" alt="Jumper Screenshot" />
+</p>
+
+
 Jumper is a lightweight macOS menu bar application that enables users to instantly move their mouse cursor to the center of any connected display using global keyboard shortcuts.
 
 ## Features
