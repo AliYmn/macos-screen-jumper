@@ -8,7 +8,6 @@
 import SwiftUI
 import AppKit
 import Cocoa
-import Carbon
 
 @main
 struct jumperApp: App {
@@ -29,8 +28,8 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @Published public var soundEffectEnabled = true
     @Published public var visualEffectEnabled = true
 
-    // Store hotkey references to prevent deallocation
-    private var hotkeyRefs: [EventHotKeyRef?] = []
+    // Store local monitor for key events
+    private var localMonitor: Any?
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         // Request accessibility permissions
@@ -294,44 +293,42 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         NSApp.terminate(nil)
     }
 
-    // MARK: - Global Hotkeys
-    
-    // Global event handler
-    private var eventHandler: Any?
+    // MARK: - Keyboard Shortcuts
     
     private func registerHotkeys() {
-        // First unregister any existing hotkeys
+        // Unregister any existing monitors
         unregisterHotkeys()
         
-        // Register a global event monitor for key events
-        eventHandler = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self = self else { return }
+        // Create a local monitor for key events
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+            guard let self = self else { return event }
             
             // Check if the event matches any of our registered shortcuts
             for (index, _) in self.screens.enumerated() {
                 let shortcut = ShortcutManager.shared.getShortcut(for: index)
                 
-                // Check if modifiers match
+                // Check if modifiers match (Control+Shift)
                 if event.modifierFlags.contains(.control) && event.modifierFlags.contains(.shift) {
-                    // Check if keycode matches
+                    // Check if keycode matches (1-9 keys)
                     if event.keyCode == UInt16(shortcut.keyCode) {
                         // Jump to the screen
                         if index < self.screens.count {
-                            DispatchQueue.main.async {
-                                self.jumpCursorToScreen(self.screens[index])
-                            }
+                            self.jumpCursorToScreen(self.screens[index])
+                            return nil // Consume the event
                         }
                     }
                 }
             }
+            
+            return event // Pass the event through
         }
     }
     
     private func unregisterHotkeys() {
-        // Remove the global event monitor
-        if let eventHandler = eventHandler as? NSObjectProtocol {
-            NSEvent.removeMonitor(eventHandler)
-            self.eventHandler = nil
+        // Remove the local monitor
+        if let localMonitor = localMonitor {
+            NSEvent.removeMonitor(localMonitor)
+            self.localMonitor = nil
         }
     }
 }

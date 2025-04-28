@@ -7,7 +7,6 @@
 
 import SwiftUI
 import AppKit
-import Carbon
 
 struct SettingsView: View {
     @ObservedObject var appDelegate: AppDelegate
@@ -173,18 +172,18 @@ struct SettingsView: View {
 
         // Get modifiers
         var modifiers: UInt32 = 0
-
+        
         if event.modifierFlags.contains(.control) {
-            modifiers |= UInt32(1 << 0) // controlKey
+            modifiers |= 1 // Control
         }
         if event.modifierFlags.contains(.shift) {
-            modifiers |= UInt32(1 << 1) // shiftKey
+            modifiers |= 2 // Shift
         }
         if event.modifierFlags.contains(.option) {
-            modifiers |= UInt32(1 << 2) // optionKey
+            modifiers |= 4 // Option
         }
         if event.modifierFlags.contains(.command) {
-            modifiers |= UInt32(1 << 3) // cmdKey
+            modifiers |= 8 // Command
         }
 
         // Create new shortcut

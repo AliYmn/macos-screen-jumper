@@ -7,7 +7,6 @@
 
 import Foundation
 import AppKit
-import Carbon
 
 public struct KeyboardShortcut: Codable, Equatable {
     public var keyCode: Int
@@ -18,7 +17,7 @@ public struct KeyboardShortcut: Codable, Equatable {
         self.modifiers = modifiers
     }
 
-    public static let defaultModifiers: UInt32 = UInt32(1 << 0) | UInt32(1 << 1) // controlKey | shiftKey
+    public static let defaultModifiers: UInt32 = 3 // Control (1) + Shift (2)
 
     public static func defaultShortcut(for screenIndex: Int) -> KeyboardShortcut {
         // Default to Control+Shift+Number (1-9)
@@ -76,16 +75,16 @@ public struct KeyboardShortcut: Codable, Equatable {
     public var modifierMask: NSEvent.ModifierFlags {
         var mask: NSEvent.ModifierFlags = []
 
-        if modifiers & UInt32(1 << 0) != 0 { // controlKey
+        if modifiers & 1 != 0 { // Control
             mask.insert(.control)
         }
-        if modifiers & UInt32(1 << 1) != 0 { // shiftKey
+        if modifiers & 2 != 0 { // Shift
             mask.insert(.shift)
         }
-        if modifiers & UInt32(1 << 2) != 0 { // optionKey
+        if modifiers & 4 != 0 { // Option
             mask.insert(.option)
         }
-        if modifiers & UInt32(1 << 3) != 0 { // cmdKey
+        if modifiers & 8 != 0 { // Command
             mask.insert(.command)
         }
 
@@ -95,16 +94,16 @@ public struct KeyboardShortcut: Codable, Equatable {
     public var description: String {
         var desc = ""
 
-        if modifiers & UInt32(1 << 0) != 0 { // controlKey
+        if modifiers & 1 != 0 { // Control
             desc += "⌃"
         }
-        if modifiers & UInt32(1 << 2) != 0 { // optionKey
-            desc += "⌥"
-        }
-        if modifiers & UInt32(1 << 1) != 0 { // shiftKey
+        if modifiers & 2 != 0 { // Shift
             desc += "⇧"
         }
-        if modifiers & UInt32(1 << 3) != 0 { // cmdKey
+        if modifiers & 4 != 0 { // Option
+            desc += "⌥"
+        }
+        if modifiers & 8 != 0 { // Command
             desc += "⌘"
         }
 
