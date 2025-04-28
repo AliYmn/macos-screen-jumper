@@ -366,11 +366,11 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             }
         }
     }
-    
-    // Show a quick jump effect at the cursor position
+
+    // Show a quick jump effect at the cursor position with high contrast colors
     private func showLightVisualEffect(at point: CGPoint) {
         // Create a simple circular highlight
-        let highlightSize: CGFloat = 60 // Large enough to be visible but not distracting
+        let highlightSize: CGFloat = 70 // Slightly larger for better visibility
         let highlightPanel = NSPanel(
             contentRect: NSRect(x: point.x - highlightSize/2, y: point.y - highlightSize/2, width: highlightSize, height: highlightSize),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -378,72 +378,122 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             defer: false
         )
 
-        // Configure the panel
+        // Configure the panel - make sure it doesn't block mouse events
         highlightPanel.backgroundColor = .clear
         highlightPanel.isOpaque = false
         highlightPanel.hasShadow = false
         highlightPanel.level = .popUpMenu
-        highlightPanel.ignoresMouseEvents = true
+        highlightPanel.ignoresMouseEvents = true // This is important - panel should not intercept mouse events
         highlightPanel.alphaValue = 0.0
 
         // Create a custom view for the highlight
         let highlightView = NSView(frame: NSRect(x: 0, y: 0, width: highlightSize, height: highlightSize))
         highlightView.wantsLayer = true
 
-        // Create the outer ring
+        // Create a background glow effect that will be visible on any background
+        let glowLayer = CAShapeLayer()
+        let glowPath = NSBezierPath(ovalIn: NSRect(x: 5, y: 5, width: highlightSize-10, height: highlightSize-10))
+        glowLayer.path = glowPath.cgPath
+        glowLayer.fillColor = NSColor.clear.cgColor
+        glowLayer.strokeColor = NSColor.white.cgColor // White outline for contrast
+        glowLayer.lineWidth = 8.0 // Thicker line for the glow
+        glowLayer.opacity = 0.3
+        glowLayer.shadowColor = NSColor.white.cgColor
+        glowLayer.shadowOffset = CGSize.zero
+        glowLayer.shadowRadius = 5.0
+        glowLayer.shadowOpacity = 0.8
+
+        // Create the outer ring with a bright, noticeable color
         let ringLayer = CAShapeLayer()
         let ringPath = NSBezierPath(ovalIn: NSRect(x: 2, y: 2, width: highlightSize-4, height: highlightSize-4))
         ringLayer.path = ringPath.cgPath
         ringLayer.fillColor = NSColor.clear.cgColor
-        ringLayer.strokeColor = NSColor.systemBlue.cgColor
-        ringLayer.lineWidth = 2.5
-        ringLayer.opacity = 0.8
-        
-        // Create the center dot
+
+        // Use a bright, high-contrast color that stands out on most backgrounds
+        // Neon colors are very visible
+        let neonGreen = NSColor(calibratedRed: 0.0, green: 1.0, blue: 0.5, alpha: 1.0)
+        ringLayer.strokeColor = neonGreen.cgColor
+        ringLayer.lineWidth = 3.0
+        ringLayer.opacity = 0.9
+
+        // Add a secondary ring with a complementary color for better visibility
+        let innerRingLayer = CAShapeLayer()
+        let innerRingPath = NSBezierPath(ovalIn: NSRect(x: 15, y: 15, width: highlightSize-30, height: highlightSize-30))
+        innerRingLayer.path = innerRingPath.cgPath
+        innerRingLayer.fillColor = NSColor.clear.cgColor
+
+        // Use a contrasting color
+        let neonPink = NSColor(calibratedRed: 1.0, green: 0.0, blue: 0.8, alpha: 1.0)
+        innerRingLayer.strokeColor = neonPink.cgColor
+        innerRingLayer.lineWidth = 2.0
+        innerRingLayer.opacity = 0.9
+
+        // Create the center dot with a bright color
         let dotLayer = CAShapeLayer()
-        let dotSize: CGFloat = 12 // Small dot in the center
+        let dotSize: CGFloat = 15 // Slightly larger dot for better visibility
         let dotPath = NSBezierPath(ovalIn: NSRect(x: (highlightSize-dotSize)/2, y: (highlightSize-dotSize)/2, width: dotSize, height: dotSize))
         dotLayer.path = dotPath.cgPath
-        dotLayer.fillColor = NSColor.systemBlue.cgColor
-        dotLayer.opacity = 0.9
+        dotLayer.fillColor = NSColor.white.cgColor // White is highly visible
+        dotLayer.opacity = 1.0
 
-        // Add the layers
+        // Add a shadow to the dot for better contrast against any background
+        dotLayer.shadowColor = NSColor.black.cgColor
+        dotLayer.shadowOffset = CGSize.zero
+        dotLayer.shadowRadius = 3.0
+        dotLayer.shadowOpacity = 0.8
+
+        // Add the layers in order (background to foreground)
+        highlightView.layer?.addSublayer(glowLayer)
         highlightView.layer?.addSublayer(ringLayer)
+        highlightView.layer?.addSublayer(innerRingLayer)
         highlightView.layer?.addSublayer(dotLayer)
         highlightPanel.contentView = highlightView
 
         // Show the panel
         highlightPanel.orderFront(nil)
 
-        // Quick pulse animation
+        // Pulse animation for the outer ring - longer but still smooth
         let pulseAnimation = CABasicAnimation(keyPath: "transform.scale")
-        pulseAnimation.duration = 0.25
-        pulseAnimation.fromValue = 0.7
+        pulseAnimation.duration = 0.4 // Longer duration
+        pulseAnimation.fromValue = 0.9
         pulseAnimation.toValue = 1.1
         pulseAnimation.autoreverses = true
         pulseAnimation.repeatCount = 1
         ringLayer.add(pulseAnimation, forKey: "pulse")
-        
-        // Dot animation (slightly delayed)
-        let dotAnimation = CABasicAnimation(keyPath: "opacity")
-        dotAnimation.duration = 0.2
-        dotAnimation.fromValue = 1.0
-        dotAnimation.toValue = 0.0
-        dotAnimation.beginTime = CACurrentMediaTime() + 0.1
-        dotLayer.add(dotAnimation, forKey: "fade")
 
-        // Quick fade-in and fade-out animation
+        // Inner ring animation with rotation - longer but still smooth
+        let rotateAnimation = CABasicAnimation(keyPath: "transform.rotation")
+        rotateAnimation.duration = 0.5 // Longer duration
+        rotateAnimation.fromValue = 0
+        rotateAnimation.toValue = CGFloat.pi * 0.1 // Slightly larger rotation
+        rotateAnimation.autoreverses = true
+        rotateAnimation.repeatCount = 1
+        innerRingLayer.add(rotateAnimation, forKey: "rotate")
+
+        // Dot animation (pulse) - longer but still smooth
+        let dotPulseAnimation = CABasicAnimation(keyPath: "transform.scale")
+        dotPulseAnimation.duration = 0.3 // Longer duration
+        dotPulseAnimation.fromValue = 1.3
+        dotPulseAnimation.toValue = 0.9
+        dotPulseAnimation.autoreverses = true
+        dotPulseAnimation.repeatCount = 1
+        dotLayer.add(dotPulseAnimation, forKey: "dotPulse")
+
+        // Fade-in and fade-out animation with moderate speed
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.15 // Fast fade-in
+            context.duration = 0.2 // Moderate fade-in
             highlightPanel.animator().alphaValue = 1.0
         }) {
-            // Quick fade-out
-            NSAnimationContext.runAnimationGroup({ context in
-                context.duration = 0.25 // Quick fade-out
-                highlightPanel.animator().alphaValue = 0.0
-            }) {
-                // Close panel
-                highlightPanel.close()
+            // Add a slight delay to keep the effect visible a bit longer
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                // Moderate fade-out
+                NSAnimationContext.runAnimationGroup({ context in
+                    context.duration = 0.3 // Moderate fade-out
+                    highlightPanel.animator().alphaValue = 0.0
+                }) {
+                    // Close panel
+                    highlightPanel.close()
+                }
             }
         }
     }
