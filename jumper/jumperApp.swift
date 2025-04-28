@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppKit
+import UserNotifications
 
 @main
 struct jumperApp: App {
@@ -78,7 +79,10 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             name: LaunchAtLogin.statusChangedNotification,
             object: nil
         )
-
+        
+        // Register app to receive background events
+        NSApplication.shared.setActivationPolicy(.accessory)
+        
         // Register keyboard shortcuts
         registerKeyboardShortcuts()
 
@@ -98,7 +102,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         if !accessEnabled {
             let alert = NSAlert()
             alert.messageText = "Accessibility Permissions Required"
-            alert.informativeText = "Jumper needs accessibility permissions to move the cursor. Please enable in System Settings > Privacy & Security > Accessibility."
+            alert.informativeText = "Jumper needs accessibility permissions to move the cursor and respond to global keyboard shortcuts. Please enable in System Settings > Privacy & Security > Accessibility."
             alert.alertStyle = .warning
             alert.addButton(withTitle: "Open Settings")
             alert.addButton(withTitle: "Later")
@@ -461,39 +465,104 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private func registerKeyboardShortcuts() {
         // Remove any existing monitors
         unregisterKeyboardShortcuts()
-
-        // Create a global monitor for key events
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            _ = self?.handleKeyEvent(event)
+        
+        // Register app to receive keyboard events in the background
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        let accessEnabled = AXIsProcessTrustedWithOptions(options as CFDictionary)
+        
+        if !accessEnabled {
+            // Show a notification that accessibility permissions are needed
+            let center = UNUserNotificationCenter.current()
+            center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+                if granted {
+                    DispatchQueue.main.async {
+                        let content = UNMutableNotificationContent()
+                        content.title = "Accessibility Permissions Required"
+                        content.body = "Jumper needs accessibility permissions to work globally."
+                        content.sound = UNNotificationSound.default
+                        
+                        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+                        center.add(request)
+                    }
+                }
+            }
+            
+            // Prompt user to enable accessibility
+            DispatchQueue.main.async {
+                let alert = NSAlert()
+                alert.messageText = "Accessibility Permissions Required"
+                alert.informativeText = "Jumper needs accessibility permissions to detect global shortcuts. Please enable in System Settings > Privacy & Security > Accessibility."
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "Open Settings")
+                alert.addButton(withTitle: "Later")
+                
+                let response = alert.runModal()
+                if response == .alertFirstButtonReturn {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                }
+            }
+        }
+        
+        // Create a global monitor for key events that works even when app isn't active
+        // Use flags to ensure we capture all key combinations
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+            guard let self = self else { return }
+            
+            // Only process keyDown events
+            if event.type == .keyDown {
+                print("Global key event detected: \(event.keyCode) with modifiers: \(event.modifierFlags.rawValue)")
+                _ = self.handleKeyEvent(event)
+            }
         }
 
         // Create a local monitor for key events (when app is active)
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
             guard let self = self else { return event }
-
-            if self.handleKeyEvent(event) {
-                return nil // Consume the event
+            
+            // Only process keyDown events
+            if event.type == .keyDown {
+                print("Local key event detected: \(event.keyCode) with modifiers: \(event.modifierFlags.rawValue)")
+                if self.handleKeyEvent(event) {
+                    return nil // Consume the event
+                }
             }
-
+            
             return event // Pass the event through
         }
+        
+        print("Keyboard shortcuts registered. Global monitor: \(String(describing: globalMonitor)), Local monitor: \(String(describing: localMonitor))")
     }
 
     private func handleKeyEvent(_ event: NSEvent) -> Bool {
         // Check if we have screens to jump to
         guard !screens.isEmpty else { return false }
+        
+        // Debug info
+        print("Handling key event: keyCode=\(event.keyCode), modifiers=\(event.modifierFlags.rawValue)")
 
         // Check all screens
         for (index, screen) in screens.enumerated() {
             // Get the shortcut defined for this screen
             let shortcut = ShortcutManager.shared.getShortcut(for: index)
+            
+            // Debug info for this shortcut
+            print("Checking shortcut for screen \(index): keyCode=\(shortcut.keyCode), modifiers=\(shortcut.modifiers)")
 
-            // Check if the shortcut keys and modifiers match
-            if event.keyCode == shortcut.keyCode &&
-               event.modifierFlags.contains(shortcut.modifierMask) {
-                // Match found, move cursor to this screen
-                jumpCursorToScreen(screen)
-                return true
+            // Check if the shortcut keys match
+            if event.keyCode == shortcut.keyCode {
+                // Check if the modifiers match (more lenient matching)
+                let requiredModifiers = shortcut.modifierMask
+                let eventModifiers = event.modifierFlags.intersection([.shift, .control, .option, .command])
+                
+                print("Required modifiers: \(requiredModifiers), Event modifiers: \(eventModifiers)")
+                
+                // Check if all required modifiers are present
+                if eventModifiers == requiredModifiers {
+                    print("Shortcut matched! Moving cursor to screen \(index)")
+                    // Match found, move cursor to this screen
+                    jumpCursorToScreen(screen)
+                    return true
+                }
             }
         }
 
