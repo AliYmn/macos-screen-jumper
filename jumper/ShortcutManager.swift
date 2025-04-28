@@ -113,7 +113,7 @@ public struct KeyboardShortcut: Codable, Equatable {
     }
 }
 
-// Kısayol değişikliklerini bildirmek için bildirim adı
+// Notification name for shortcut changes
 public let shortcutsChangedNotification = Notification.Name("JumperShortcutsChanged")
 
 public class ShortcutManager {
@@ -122,16 +122,29 @@ public class ShortcutManager {
     private let userDefaultsKey = "JumperKeyboardShortcuts"
     private var shortcuts: [Int: KeyboardShortcut] = [:]
 
+    // Cache for frequently accessed shortcuts to improve performance
+    private var shortcutCache: [Int: KeyboardShortcut] = [:]
+
     private init() {
         loadShortcuts()
     }
 
     public func getShortcut(for screenIndex: Int) -> KeyboardShortcut {
+        // First check the cache for better performance
+        if let cachedShortcut = shortcutCache[screenIndex] {
+            return cachedShortcut
+        }
+
+        // If not in cache, check the main shortcuts dictionary
         if let shortcut = shortcuts[screenIndex] {
+            // Store in cache for future access
+            shortcutCache[screenIndex] = shortcut
             return shortcut
         } else {
+            // Create default shortcut if none exists
             let defaultShortcut = KeyboardShortcut.defaultShortcut(for: screenIndex)
             shortcuts[screenIndex] = defaultShortcut
+            shortcutCache[screenIndex] = defaultShortcut
             saveShortcuts()
             return defaultShortcut
         }
@@ -139,33 +152,47 @@ public class ShortcutManager {
 
     public func setShortcut(_ shortcut: KeyboardShortcut, for screenIndex: Int) {
         shortcuts[screenIndex] = shortcut
+        // Update cache
+        shortcutCache[screenIndex] = shortcut
         saveShortcuts()
-        
-        // Kısayol değişikliğini bildir
-        NotificationCenter.default.post(name: shortcutsChangedNotification, object: nil)
+
+        // Notify about shortcut change
+        notifyShortcutChange()
     }
 
     public func resetToDefault(for screenIndex: Int) {
-        shortcuts[screenIndex] = KeyboardShortcut.defaultShortcut(for: screenIndex)
+        let defaultShortcut = KeyboardShortcut.defaultShortcut(for: screenIndex)
+        shortcuts[screenIndex] = defaultShortcut
+        // Update cache
+        shortcutCache[screenIndex] = defaultShortcut
         saveShortcuts()
-        
-        // Kısayol değişikliğini bildir
-        NotificationCenter.default.post(name: shortcutsChangedNotification, object: nil)
+
+        // Notify about shortcut change
+        notifyShortcutChange()
     }
 
     public func resetAllShortcuts() {
-        // Tüm kısayolları temizle
+        // Clear all shortcuts
         shortcuts.removeAll()
-        
-        // Mevcut ekran sayısına göre varsayılan kısayolları ayarla
+        // Clear the cache
+        shortcutCache.removeAll()
+
+        // Set default shortcuts based on current screen count
         let screenCount = NSScreen.screens.count
         for i in 0..<screenCount {
-            shortcuts[i] = KeyboardShortcut.defaultShortcut(for: i)
+            let defaultShortcut = KeyboardShortcut.defaultShortcut(for: i)
+            shortcuts[i] = defaultShortcut
+            shortcutCache[i] = defaultShortcut
         }
-        
+
         saveShortcuts()
-        
-        // Kısayol değişikliğini bildir
+
+        // Notify about shortcut change
+        notifyShortcutChange()
+    }
+
+    // Helper method to notify about shortcut changes
+    private func notifyShortcutChange() {
         NotificationCenter.default.post(name: shortcutsChangedNotification, object: nil)
     }
 

@@ -24,8 +24,63 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private var statusItem: NSStatusItem!
     private var statusBarMenu: NSMenu!
     public var screens: [NSScreen] = []
+
+    // Sound effect settings
     @Published public var soundEffectEnabled = true
+    @Published public var soundVolume: Double = 0.8
+    @Published public var selectedSoundEffect: SoundEffectType = .pop
+
+    // Sound effect types
+    public enum SoundEffectType: Int, CaseIterable {
+        case pop = 0
+        case click = 1
+        case swoosh = 2
+        case beep = 3
+        case tink = 4
+
+        var name: String {
+            switch self {
+            case .pop: return "Pop"
+            case .click: return "Click"
+            case .swoosh: return "Swoosh"
+            case .beep: return "Beep"
+            case .tink: return "Tink"
+            }
+        }
+
+        var soundName: String {
+            switch self {
+            case .pop: return "Pop"
+            case .click: return "Tink"
+            case .swoosh: return "Submarine"
+            case .beep: return "Basso"
+            case .tink: return "Funk"
+            }
+        }
+    }
+
+    // Visual effect settings
     @Published public var visualEffectEnabled = true
+    @Published public var visualEffectStyle: VisualEffectStyle = .modern
+
+    // Startup settings
+    @Published public var showWelcomeScreen = false
+    @Published public var checkForUpdatesAutomatically = true
+
+    // Visual effect style enum
+    public enum VisualEffectStyle: Int, CaseIterable {
+        case modern = 0
+        case classic = 1
+        case minimal = 2
+
+        var name: String {
+            switch self {
+            case .modern: return "Modern"
+            case .classic: return "Classic"
+            case .minimal: return "Minimal"
+            }
+        }
+    }
 
     // Pre-created sound object for sound effect
     private var popSound: NSSound?
@@ -41,7 +96,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private var globalMonitor: Any?
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
-        // Hide from Dock
+        // Hide from Dock and register app to receive background events
         NSApp.setActivationPolicy(.accessory)
 
         // Request accessibility permissions
@@ -56,32 +111,8 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // Pre-create sound object
         popSound = NSSound(named: "Pop")
 
-        // Register for screen change notifications
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(screensDidChange),
-            name: NSApplication.didChangeScreenParametersNotification,
-            object: nil
-        )
-
-        // Listen for shortcut changes
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(shortcutsDidChange),
-            name: shortcutsChangedNotification,
-            object: nil
-        )
-
-        // Listen for launch at login status changes
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(launchAtLoginStatusDidChange),
-            name: LaunchAtLogin.statusChangedNotification,
-            object: nil
-        )
-
-        // Register app to receive background events
-        NSApplication.shared.setActivationPolicy(.accessory)
+        // Setup all notification observers
+        setupNotificationObservers()
 
         // Register keyboard shortcuts
         registerKeyboardShortcuts()
@@ -119,8 +150,17 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem.button {
-            // Mouse and jump themed icon
-            button.image = NSImage(systemSymbolName: "cursorarrow.rays", accessibilityDescription: "Jumper")
+            // Use a more visible icon for menu bar
+            let config = NSImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+            let menuIcon = NSImage(systemSymbolName: "cursorarrow.click.2", accessibilityDescription: "Jumper")?.
+                withSymbolConfiguration(config) ?? NSImage(systemSymbolName: "cursorarrow.rays", accessibilityDescription: "Jumper")!
+
+            // Set the icon
+            button.image = menuIcon
+
+            // Increase the button size to accommodate the icon
+            button.frame = NSRect(x: button.frame.origin.x, y: button.frame.origin.y,
+                                 width: button.frame.width + 8, height: button.frame.height)
             button.imagePosition = .imageLeft
         }
 
@@ -166,6 +206,33 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     // Ask for Launch at Login permission once when app is first launched
+    // Setup all notification observers in one place for better organization
+    private func setupNotificationObservers() {
+        // Register for screen change notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screensDidChange),
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
+
+        // Listen for shortcut changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(shortcutsDidChange),
+            name: shortcutsChangedNotification,
+            object: nil
+        )
+
+        // Listen for launch at login status changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(launchAtLoginStatusDidChange),
+            name: LaunchAtLogin.statusChangedNotification,
+            object: nil
+        )
+    }
+
     private func askForLaunchAtLoginPermission() {
         let defaults = UserDefaults.standard
 
@@ -352,9 +419,12 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
         // Play sound if enabled
         if soundEffectEnabled {
-            // Create sound object if needed or use existing one
-            if popSound == nil {
-                popSound = NSSound(named: "Pop")
+            // Get the sound name based on selected effect
+            let soundName = selectedSoundEffect.soundName
+
+            // Create or update sound object if needed
+            if popSound == nil || popSound?.name != soundName {
+                popSound = NSSound(named: soundName)
             }
 
             // If sound is playing, stop it and restart
@@ -362,87 +432,86 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 if sound.isPlaying {
                     sound.stop()
                 }
+                // Set volume based on user preference
+                sound.volume = Float(soundVolume)
                 sound.play()
+            }
+        }
+    }
+
+    // Constants for visual effect
+    private struct VisualEffectConstants {
+        // Base constants
+        static let highlightSize: CGFloat = 70
+        static let glowInset: CGFloat = 5
+        static let ringInset: CGFloat = 2
+        static let innerRingInset: CGFloat = 15
+        static let dotSize: CGFloat = 15
+
+        // Modern style colors (default)
+        static let modernOuterColor = NSColor(calibratedRed: 0.0, green: 1.0, blue: 0.5, alpha: 1.0) // Neon green
+        static let modernInnerColor = NSColor(calibratedRed: 1.0, green: 0.0, blue: 0.8, alpha: 1.0) // Neon pink
+        static let modernDotColor = NSColor.white
+
+        // Classic style colors
+        static let classicOuterColor = NSColor.systemBlue
+        static let classicInnerColor = NSColor.systemBlue.withAlphaComponent(0.7)
+        static let classicDotColor = NSColor.white
+
+        // Minimal style colors
+        static let minimalOuterColor = NSColor.white.withAlphaComponent(0.8)
+        static let minimalInnerColor = NSColor.clear
+        static let minimalDotColor = NSColor.white
+
+        // Animation durations
+        static let fadeInDuration: TimeInterval = 0.2
+        static let visibleDuration: TimeInterval = 0.3
+        static let fadeOutDuration: TimeInterval = 0.3
+        static let ringPulseDuration: TimeInterval = 0.4
+        static let ringRotationDuration: TimeInterval = 0.5
+        static let dotPulseDuration: TimeInterval = 0.3
+
+        // Get colors based on current style
+        static func getOuterColor(for style: VisualEffectStyle) -> NSColor {
+            switch style {
+            case .modern: return modernOuterColor
+            case .classic: return classicOuterColor
+            case .minimal: return minimalOuterColor
+            }
+        }
+
+        static func getInnerColor(for style: VisualEffectStyle) -> NSColor {
+            switch style {
+            case .modern: return modernInnerColor
+            case .classic: return classicInnerColor
+            case .minimal: return minimalInnerColor
+            }
+        }
+
+        static func getDotColor(for style: VisualEffectStyle) -> NSColor {
+            switch style {
+            case .modern: return modernDotColor
+            case .classic: return classicDotColor
+            case .minimal: return minimalDotColor
             }
         }
     }
 
     // Show a quick jump effect at the cursor position with high contrast colors
     private func showLightVisualEffect(at point: CGPoint) {
-        // Create a simple circular highlight
-        let highlightSize: CGFloat = 70 // Slightly larger for better visibility
-        let highlightPanel = NSPanel(
-            contentRect: NSRect(x: point.x - highlightSize/2, y: point.y - highlightSize/2, width: highlightSize, height: highlightSize),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
+        let constants = VisualEffectConstants.self
+        let highlightSize = constants.highlightSize
 
-        // Configure the panel - make sure it doesn't block mouse events
-        highlightPanel.backgroundColor = .clear
-        highlightPanel.isOpaque = false
-        highlightPanel.hasShadow = false
-        highlightPanel.level = .popUpMenu
-        highlightPanel.ignoresMouseEvents = true // This is important - panel should not intercept mouse events
-        highlightPanel.alphaValue = 0.0
+        // Create and configure the panel
+        let highlightPanel = createVisualEffectPanel(at: point, size: highlightSize)
 
         // Create a custom view for the highlight
         let highlightView = NSView(frame: NSRect(x: 0, y: 0, width: highlightSize, height: highlightSize))
         highlightView.wantsLayer = true
 
-        // Create a background glow effect that will be visible on any background
-        let glowLayer = CAShapeLayer()
-        let glowPath = NSBezierPath(ovalIn: NSRect(x: 5, y: 5, width: highlightSize-10, height: highlightSize-10))
-        glowLayer.path = glowPath.cgPath
-        glowLayer.fillColor = NSColor.clear.cgColor
-        glowLayer.strokeColor = NSColor.white.cgColor // White outline for contrast
-        glowLayer.lineWidth = 8.0 // Thicker line for the glow
-        glowLayer.opacity = 0.3
-        glowLayer.shadowColor = NSColor.white.cgColor
-        glowLayer.shadowOffset = CGSize.zero
-        glowLayer.shadowRadius = 5.0
-        glowLayer.shadowOpacity = 0.8
+        // Create and add all layers
+        let (glowLayer, ringLayer, innerRingLayer, dotLayer) = createVisualEffectLayers(size: highlightSize)
 
-        // Create the outer ring with a bright, noticeable color
-        let ringLayer = CAShapeLayer()
-        let ringPath = NSBezierPath(ovalIn: NSRect(x: 2, y: 2, width: highlightSize-4, height: highlightSize-4))
-        ringLayer.path = ringPath.cgPath
-        ringLayer.fillColor = NSColor.clear.cgColor
-
-        // Use a bright, high-contrast color that stands out on most backgrounds
-        // Neon colors are very visible
-        let neonGreen = NSColor(calibratedRed: 0.0, green: 1.0, blue: 0.5, alpha: 1.0)
-        ringLayer.strokeColor = neonGreen.cgColor
-        ringLayer.lineWidth = 3.0
-        ringLayer.opacity = 0.9
-
-        // Add a secondary ring with a complementary color for better visibility
-        let innerRingLayer = CAShapeLayer()
-        let innerRingPath = NSBezierPath(ovalIn: NSRect(x: 15, y: 15, width: highlightSize-30, height: highlightSize-30))
-        innerRingLayer.path = innerRingPath.cgPath
-        innerRingLayer.fillColor = NSColor.clear.cgColor
-
-        // Use a contrasting color
-        let neonPink = NSColor(calibratedRed: 1.0, green: 0.0, blue: 0.8, alpha: 1.0)
-        innerRingLayer.strokeColor = neonPink.cgColor
-        innerRingLayer.lineWidth = 2.0
-        innerRingLayer.opacity = 0.9
-
-        // Create the center dot with a bright color
-        let dotLayer = CAShapeLayer()
-        let dotSize: CGFloat = 15 // Slightly larger dot for better visibility
-        let dotPath = NSBezierPath(ovalIn: NSRect(x: (highlightSize-dotSize)/2, y: (highlightSize-dotSize)/2, width: dotSize, height: dotSize))
-        dotLayer.path = dotPath.cgPath
-        dotLayer.fillColor = NSColor.white.cgColor // White is highly visible
-        dotLayer.opacity = 1.0
-
-        // Add a shadow to the dot for better contrast against any background
-        dotLayer.shadowColor = NSColor.black.cgColor
-        dotLayer.shadowOffset = CGSize.zero
-        dotLayer.shadowRadius = 3.0
-        dotLayer.shadowOpacity = 0.8
-
-        // Add the layers in order (background to foreground)
         highlightView.layer?.addSublayer(glowLayer)
         highlightView.layer?.addSublayer(ringLayer)
         highlightView.layer?.addSublayer(innerRingLayer)
@@ -452,47 +521,141 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // Show the panel
         highlightPanel.orderFront(nil)
 
-        // Pulse animation for the outer ring - longer but still smooth
+        // Add animations
+        addAnimationsToLayers(ringLayer: ringLayer, innerRingLayer: innerRingLayer, dotLayer: dotLayer)
+
+        // Handle panel fade-in/out and cleanup
+        animatePanelVisibility(panel: highlightPanel)
+    }
+
+    // Create the panel for the visual effect
+    private func createVisualEffectPanel(at point: CGPoint, size: CGFloat) -> NSPanel {
+        let panel = NSPanel(
+            contentRect: NSRect(x: point.x - size/2, y: point.y - size/2, width: size, height: size),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+
+        // Configure the panel - make sure it doesn't block mouse events
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = false
+        panel.level = .popUpMenu
+        panel.ignoresMouseEvents = true // This is important - panel should not intercept mouse events
+        panel.alphaValue = 0.0
+
+        return panel
+    }
+
+    // Create all the layers for the visual effect
+    private func createVisualEffectLayers(size: CGFloat) -> (glow: CAShapeLayer, ring: CAShapeLayer, innerRing: CAShapeLayer, dot: CAShapeLayer) {
+        let constants = VisualEffectConstants.self
+
+        // Get colors based on the selected style
+        let outerColor = constants.getOuterColor(for: visualEffectStyle)
+        let innerColor = constants.getInnerColor(for: visualEffectStyle)
+        let dotColor = constants.getDotColor(for: visualEffectStyle)
+
+        // Create a background glow effect
+        let glowLayer = CAShapeLayer()
+        let glowInset = constants.glowInset
+        let glowPath = NSBezierPath(ovalIn: NSRect(x: glowInset, y: glowInset, width: size-glowInset*2, height: size-glowInset*2))
+        glowLayer.path = glowPath.cgPath
+        glowLayer.fillColor = NSColor.clear.cgColor
+        glowLayer.strokeColor = NSColor.white.cgColor
+        glowLayer.lineWidth = 8.0
+        glowLayer.opacity = 0.3
+        glowLayer.shadowColor = NSColor.white.cgColor
+        glowLayer.shadowOffset = CGSize.zero
+        glowLayer.shadowRadius = 5.0
+        glowLayer.shadowOpacity = 0.8
+
+        // Create the outer ring
+        let ringLayer = CAShapeLayer()
+        let ringInset = constants.ringInset
+        let ringPath = NSBezierPath(ovalIn: NSRect(x: ringInset, y: ringInset, width: size-ringInset*2, height: size-ringInset*2))
+        ringLayer.path = ringPath.cgPath
+        ringLayer.fillColor = NSColor.clear.cgColor
+        ringLayer.strokeColor = outerColor.cgColor
+        ringLayer.lineWidth = 3.0
+        ringLayer.opacity = 0.9
+
+        // Create the inner ring
+        let innerRingLayer = CAShapeLayer()
+        let innerRingInset = constants.innerRingInset
+        let innerRingPath = NSBezierPath(ovalIn: NSRect(x: innerRingInset, y: innerRingInset, width: size-innerRingInset*2, height: size-innerRingInset*2))
+        innerRingLayer.path = innerRingPath.cgPath
+        innerRingLayer.fillColor = NSColor.clear.cgColor
+        innerRingLayer.strokeColor = innerColor.cgColor
+        innerRingLayer.lineWidth = 2.0
+        innerRingLayer.opacity = 0.9
+
+        // Create the center dot
+        let dotLayer = CAShapeLayer()
+        let dotSize = constants.dotSize
+        let dotPath = NSBezierPath(ovalIn: NSRect(x: (size-dotSize)/2, y: (size-dotSize)/2, width: dotSize, height: dotSize))
+        dotLayer.path = dotPath.cgPath
+        dotLayer.fillColor = dotColor.cgColor
+        dotLayer.opacity = 1.0
+        dotLayer.shadowColor = NSColor.black.cgColor
+        dotLayer.shadowOffset = CGSize.zero
+        dotLayer.shadowRadius = 3.0
+        dotLayer.shadowOpacity = 0.8
+
+        return (glowLayer, ringLayer, innerRingLayer, dotLayer)
+    }
+
+    // Add animations to the visual effect layers
+    private func addAnimationsToLayers(ringLayer: CAShapeLayer, innerRingLayer: CAShapeLayer, dotLayer: CAShapeLayer) {
+        let constants = VisualEffectConstants.self
+
+        // Pulse animation for the outer ring
         let pulseAnimation = CABasicAnimation(keyPath: "transform.scale")
-        pulseAnimation.duration = 0.4 // Longer duration
+        pulseAnimation.duration = constants.ringPulseDuration
         pulseAnimation.fromValue = 0.9
         pulseAnimation.toValue = 1.1
         pulseAnimation.autoreverses = true
         pulseAnimation.repeatCount = 1
         ringLayer.add(pulseAnimation, forKey: "pulse")
 
-        // Inner ring animation with rotation - longer but still smooth
+        // Inner ring animation with rotation
         let rotateAnimation = CABasicAnimation(keyPath: "transform.rotation")
-        rotateAnimation.duration = 0.5 // Longer duration
+        rotateAnimation.duration = constants.ringRotationDuration
         rotateAnimation.fromValue = 0
-        rotateAnimation.toValue = CGFloat.pi * 0.1 // Slightly larger rotation
+        rotateAnimation.toValue = CGFloat.pi * 0.1
         rotateAnimation.autoreverses = true
         rotateAnimation.repeatCount = 1
         innerRingLayer.add(rotateAnimation, forKey: "rotate")
 
-        // Dot animation (pulse) - longer but still smooth
+        // Dot animation (pulse)
         let dotPulseAnimation = CABasicAnimation(keyPath: "transform.scale")
-        dotPulseAnimation.duration = 0.3 // Longer duration
+        dotPulseAnimation.duration = constants.dotPulseDuration
         dotPulseAnimation.fromValue = 1.3
         dotPulseAnimation.toValue = 0.9
         dotPulseAnimation.autoreverses = true
         dotPulseAnimation.repeatCount = 1
         dotLayer.add(dotPulseAnimation, forKey: "dotPulse")
+    }
 
-        // Fade-in and fade-out animation with moderate speed
+    // Handle panel visibility animations and cleanup
+    private func animatePanelVisibility(panel: NSPanel) {
+        let constants = VisualEffectConstants.self
+
+        // Fade-in animation
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.2 // Moderate fade-in
-            highlightPanel.animator().alphaValue = 1.0
+            context.duration = constants.fadeInDuration
+            panel.animator().alphaValue = 1.0
         }) {
-            // Add a slight delay to keep the effect visible a bit longer
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                // Moderate fade-out
+            // Add a slight delay to keep the effect visible
+            DispatchQueue.main.asyncAfter(deadline: .now() + constants.visibleDuration) {
+                // Fade-out animation
                 NSAnimationContext.runAnimationGroup({ context in
-                    context.duration = 0.3 // Moderate fade-out
-                    highlightPanel.animator().alphaValue = 0.0
+                    context.duration = constants.fadeOutDuration
+                    panel.animator().alphaValue = 0.0
                 }) {
                     // Close panel
-                    highlightPanel.close()
+                    panel.close()
                 }
             }
         }
@@ -512,6 +675,11 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
     }
 
+    // Constants for keyboard shortcut handling
+    private struct KeyboardShortcutConstants {
+        static let debugMode = false // Set to false in production to disable debug prints
+    }
+
     private func registerKeyboardShortcuts() {
         // Remove any existing monitors
         unregisterKeyboardShortcuts()
@@ -522,38 +690,38 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         let accessEnabled = AXIsProcessTrustedWithOptions(options as CFDictionary)
 
         // Just print debug information
-        if !accessEnabled {
+        if !accessEnabled && KeyboardShortcutConstants.debugMode {
             print("Accessibility permissions not granted. Global shortcuts may not work.")
         }
 
         // Create a global monitor for key events that works even when app isn't active
-        // Use flags to ensure we capture all key combinations
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             guard let self = self else { return }
 
-            // Only process keyDown events
-            if event.type == .keyDown {
+            if KeyboardShortcutConstants.debugMode {
                 print("Global key event detected: \(event.keyCode) with modifiers: \(event.modifierFlags.rawValue)")
-                _ = self.handleKeyEvent(event)
             }
+            _ = self.handleKeyEvent(event)
         }
 
         // Create a local monitor for key events (when app is active)
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             guard let self = self else { return event }
 
-            // Only process keyDown events
-            if event.type == .keyDown {
+            if KeyboardShortcutConstants.debugMode {
                 print("Local key event detected: \(event.keyCode) with modifiers: \(event.modifierFlags.rawValue)")
-                if self.handleKeyEvent(event) {
-                    return nil // Consume the event
-                }
+            }
+
+            if self.handleKeyEvent(event) {
+                return nil // Consume the event
             }
 
             return event // Pass the event through
         }
 
-        print("Keyboard shortcuts registered. Global monitor: \(String(describing: globalMonitor)), Local monitor: \(String(describing: localMonitor))")
+        if KeyboardShortcutConstants.debugMode {
+            print("Keyboard shortcuts registered. Global monitor: \(String(describing: globalMonitor)), Local monitor: \(String(describing: localMonitor))")
+        }
     }
 
     private func handleKeyEvent(_ event: NSEvent) -> Bool {
@@ -561,27 +729,41 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         guard !screens.isEmpty else { return false }
 
         // Debug info
-        print("Handling key event: keyCode=\(event.keyCode), modifiers=\(event.modifierFlags.rawValue)")
+        if KeyboardShortcutConstants.debugMode {
+            print("Handling key event: keyCode=\(event.keyCode), modifiers=\(event.modifierFlags.rawValue)")
+        }
+
+        // Get the event modifiers once for all comparisons
+        let eventModifiers = event.modifierFlags.intersection([.shift, .control, .option, .command])
+
+        // Create a cache of shortcuts for better performance
+        // This avoids repeated calls to ShortcutManager.shared.getShortcut
+        let shortcutsCache = screens.indices.map { ShortcutManager.shared.getShortcut(for: $0) }
 
         // Check all screens
         for (index, screen) in screens.enumerated() {
-            // Get the shortcut defined for this screen
-            let shortcut = ShortcutManager.shared.getShortcut(for: index)
+            // Get the shortcut from our cache
+            let shortcut = shortcutsCache[index]
 
             // Debug info for this shortcut
-            print("Checking shortcut for screen \(index): keyCode=\(shortcut.keyCode), modifiers=\(shortcut.modifiers)")
+            if KeyboardShortcutConstants.debugMode {
+                print("Checking shortcut for screen \(index): keyCode=\(shortcut.keyCode), modifiers=\(shortcut.modifiers)")
+            }
 
             // Check if the shortcut keys match
             if event.keyCode == shortcut.keyCode {
-                // Check if the modifiers match (more lenient matching)
+                // Check if the modifiers match
                 let requiredModifiers = shortcut.modifierMask
-                let eventModifiers = event.modifierFlags.intersection([.shift, .control, .option, .command])
 
-                print("Required modifiers: \(requiredModifiers), Event modifiers: \(eventModifiers)")
+                if KeyboardShortcutConstants.debugMode {
+                    print("Required modifiers: \(requiredModifiers), Event modifiers: \(eventModifiers)")
+                }
 
                 // Check if all required modifiers are present
                 if eventModifiers == requiredModifiers {
-                    print("Shortcut matched! Moving cursor to screen \(index)")
+                    if KeyboardShortcutConstants.debugMode {
+                        print("Shortcut matched! Moving cursor to screen \(index)")
+                    }
                     // Match found, move cursor to this screen
                     jumpCursorToScreen(screen)
                     return true

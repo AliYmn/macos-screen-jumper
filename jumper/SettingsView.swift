@@ -19,25 +19,153 @@ struct SettingsView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             // General Settings Tab
-            VStack(spacing: 16) {
-                Toggle("Enable Sound Effect", isOn: $appDelegate.soundEffectEnabled)
-                    .padding(.horizontal)
-                Toggle("Enable Visual Effect", isOn: $appDelegate.visualEffectEnabled)
-                    .padding(.horizontal)
+            VStack(spacing: 0) {
+                Spacer().frame(height: 10)
 
-                VStack {
-                    HStack {
-                        Spacer()
-                        Toggle("Start automatically when you log in", isOn: $autoLaunch)
-                            .onChange(of: autoLaunch) { oldValue, newValue in
-                                LaunchAtLogin.shared.setEnabled(newValue)
+                // All Settings in One Box
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 20) {
+                        // VISUAL EFFECTS
+                        VStack(alignment: .leading, spacing: 15) {
+                            HStack {
+                                Image(systemName: "sparkles")
+                                    .foregroundColor(.blue)
+                                    .frame(width: 20)
+                                Text("Visual Effects")
+                                    .font(.headline)
                             }
-                        Spacer()
+                            
+                            Toggle("Enable visual effects when jumping", isOn: $appDelegate.visualEffectEnabled)
+                                .toggleStyle(SwitchToggleStyle())
+                                .padding(.leading, 5)
+                            
+                            Text("Effect Style:")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .padding(.leading, 5)
+                            
+                            Picker("", selection: Binding<Int>(
+                                get: { appDelegate.visualEffectStyle.rawValue },
+                                set: { appDelegate.visualEffectStyle = AppDelegate.VisualEffectStyle(rawValue: $0) ?? .modern }
+                            )) {
+                                ForEach(AppDelegate.VisualEffectStyle.allCases, id: \.rawValue) { style in
+                                    Text(style.name).tag(style.rawValue)
+                                }
+                            }
+                            .pickerStyle(SegmentedPickerStyle())
+                            .disabled(!appDelegate.visualEffectEnabled)
+                            .padding(.leading, 5)
+                        }
+                        
+                        Divider()
+                        
+                        // SOUND EFFECTS
+                        VStack(alignment: .leading, spacing: 15) {
+                            HStack {
+                                Image(systemName: "speaker.wave.2")
+                                    .foregroundColor(.blue)
+                                    .frame(width: 20)
+                                Text("Sound Effects")
+                                    .font(.headline)
+                            }
+                            
+                            Toggle("Enable sound effects when jumping", isOn: $appDelegate.soundEffectEnabled)
+                                .toggleStyle(SwitchToggleStyle())
+                                .padding(.leading, 5)
+                            
+                            Text("Sound Type:")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .padding(.leading, 5)
+                            
+                            Picker("", selection: Binding<Int>(
+                                get: { appDelegate.selectedSoundEffect.rawValue },
+                                set: { appDelegate.selectedSoundEffect = AppDelegate.SoundEffectType(rawValue: $0) ?? .pop }
+                            )) {
+                                ForEach(AppDelegate.SoundEffectType.allCases, id: \.rawValue) { sound in
+                                    Text(sound.name).tag(sound.rawValue)
+                                }
+                            }
+                            .pickerStyle(SegmentedPickerStyle())
+                            .disabled(!appDelegate.soundEffectEnabled)
+                            .padding(.leading, 5)
+                            
+                            HStack {
+                                Text("Volume:")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                
+                                Slider(value: $appDelegate.soundVolume, in: 0...1)
+                                    .disabled(!appDelegate.soundEffectEnabled)
+                                
+                                Text("\(Int(appDelegate.soundVolume * 100))%")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                                    .frame(width: 40, alignment: .trailing)
+                            }
+                            .padding(.leading, 5)
+                        }
+                        
+                        Divider()
+                        
+                        // SYSTEM SETTINGS
+                        VStack(alignment: .leading, spacing: 15) {
+                            HStack {
+                                Image(systemName: "gearshape")
+                                    .foregroundColor(.blue)
+                                    .frame(width: 20)
+                                Text("System Settings")
+                                    .font(.headline)
+                            }
+                            
+                            // Startup Option
+                            Toggle("Launch Jumper when you log in", isOn: $autoLaunch)
+                                .toggleStyle(SwitchToggleStyle())
+                                .onChange(of: autoLaunch) { oldValue, newValue in
+                                    LaunchAtLogin.shared.setEnabled(newValue)
+                                }
+                                .padding(.leading, 5)
+                            
+                            // Permissions
+                            HStack {
+                                Text("Accessibility Permission:")
+                                    .font(.subheadline)
+
+                                Spacer()
+
+                                HStack(spacing: 5) {
+                                    if AXIsProcessTrusted() {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.green)
+                                        Text("Granted")
+                                            .foregroundColor(.green)
+                                    } else {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .foregroundColor(.red)
+                                        Text("Not Granted")
+                                            .foregroundColor(.red)
+                                    }
+                                }
+                            }
+                            .padding(.leading, 5)
+
+                            if !AXIsProcessTrusted() {
+                                Button("Open Accessibility Settings") {
+                                    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+                                    AXIsProcessTrustedWithOptions(options as CFDictionary)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.leading, 5)
+                            }
+                        }
                     }
+                    .padding(.vertical, 10)
                 }
                 .padding(.horizontal)
 
-                Spacer()
+                Spacer().frame(height: 8)
             }
             .padding(.top, 20)
             .onAppear {
@@ -56,7 +184,7 @@ struct SettingsView: View {
             }
             .tag(0)
 
-            // Shortcuts Tab
+            // Screens Tab
             VStack {
                 List {
                     ForEach(0..<appDelegate.screens.count, id: \.self) { index in
@@ -94,42 +222,73 @@ struct SettingsView: View {
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
-
-
                         }
                         .padding(.vertical, 4)
                     }
                 }
 
-
+                // Refresh Screens Button at the bottom right
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        appDelegate.updateScreens()
+                    }) {
+                        Label("Refresh Screens", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                }
             }
             .tabItem {
-                Label("Shortcuts", systemImage: "keyboard")
+                Label("Screens", systemImage: "display.2")
             }
             .tag(1)
 
             // About Tab
             VStack(spacing: 20) {
-                Text("Jumper")
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .foregroundColor(.primary)
+                // App Name and Version
+                VStack(spacing: 8) {
+                    Text("Jumper")
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
 
-                Text("Version 1.0")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
+                    Text("Version 1.0")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.top, 20)
 
-                Text("A lightweight utility to jump your cursor between screens using keyboard shortcuts")
+                // App Description
+                Text("Quickly jump your cursor between screens with customizable keyboard shortcuts")
                     .font(.body)
+                    .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 10)
 
-                Link("View on GitHub", destination: URL(string: "https://github.com/AliYmn/macos-jumper")!)
-                    .buttonStyle(BorderlessButtonStyle())
-                    .foregroundColor(.blue)
+                // Features List
+                VStack(alignment: .leading, spacing: 8) {
+                    FeatureRow(icon: "keyboard", text: "Global keyboard shortcuts")
+                    FeatureRow(icon: "display.2", text: "Multi-screen support")
+                    FeatureRow(icon: "sparkles", text: "Visual effects")
+                    FeatureRow(icon: "gearshape", text: "Customizable settings")
+                }
+                .padding(.top, 10)
 
                 Spacer()
 
-                Text("© 2025 Jumper App")
+                // Links
+                HStack(spacing: 20) {
+                    Link("GitHub", destination: URL(string: "https://github.com/AliYmn/macos-jumper")!)
+                    Link("Report Issue", destination: URL(string: "https://github.com/AliYmn/macos-jumper/issues")!)
+                    Link("Website", destination: URL(string: "https://aliyaman.dev")!)
+                }
+                .padding(.bottom, 10)
+
+                // Copyright
+                Text("© \(Calendar.current.component(.year, from: Date())) Jumper App")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -141,7 +300,7 @@ struct SettingsView: View {
             .tag(2)
         }
         .padding()
-        .frame(width: 500, height: 400)
+        .frame(width: 600, height: 550)
         .onAppear {
             setupKeyboardMonitoring()
         }
@@ -207,11 +366,30 @@ struct SettingsView: View {
     }
 }
 
+// Feature row component for About tab
+struct FeatureRow: View {
+    let icon: String
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .frame(width: 24, height: 24)
+                .foregroundColor(.blue)
+
+            Text(text)
+                .font(.system(size: 14))
+        }
+        .padding(.horizontal)
+    }
+}
+
 // Helper to convert NSHostingView to NSView for use in AppKit
 class SettingsWindowController: NSWindowController {
     convenience init(appDelegate: AppDelegate) {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 400),
+            contentRect: NSRect(x: 0, y: 0, width: 650, height: 600),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
