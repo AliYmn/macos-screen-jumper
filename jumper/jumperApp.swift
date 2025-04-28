@@ -296,108 +296,42 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     // MARK: - Global Hotkeys
     
-    // Global event handler function
-    private var hotKeyFunction: EventHandlerUPP?
+    // Global event handler
+    private var eventHandler: Any?
     
     private func registerHotkeys() {
         // First unregister any existing hotkeys
         unregisterHotkeys()
         
-        // Create a global event handler function
-        hotKeyFunction = NewEventHandlerUPP(hotKeyHandler)
-        
-        // Register hotkeys for each screen
-        for (index, _) in screens.enumerated() {
-            registerHotkey(for: index)
-        }
-    }
-    
-    // C function for handling hotkey events
-    private func hotKeyHandler(_ nextHandler: EventHandlerCallRef?, _ theEvent: EventRef?, _ userData: UnsafeMutableRawPointer?) -> OSStatus {
-        var hotKeyID = EventHotKeyID()
-        let status = GetEventParameter(
-            theEvent,
-            EventParamName(kEventParamDirectObject),
-            EventParamType(typeEventHotKeyID),
-            nil,
-            MemoryLayout<EventHotKeyID>.size,
-            nil,
-            &hotKeyID
-        )
-        
-        if status == noErr && hotKeyID.signature == 0x4A554D50 { // 'JUMP' in hex
-            let screenIndex = Int(hotKeyID.id)
+        // Register a global event monitor for key events
+        eventHandler = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self = self else { return }
             
-            // Use the main app delegate to handle the jump
-            if let appDelegate = NSApp.delegate as? AppDelegate {
-                DispatchQueue.main.async {
-                    if screenIndex < appDelegate.screens.count {
-                        appDelegate.jumpCursorToScreen(appDelegate.screens[screenIndex])
+            // Check if the event matches any of our registered shortcuts
+            for (index, _) in self.screens.enumerated() {
+                let shortcut = ShortcutManager.shared.getShortcut(for: index)
+                
+                // Check if modifiers match
+                if event.modifierFlags.contains(.control) && event.modifierFlags.contains(.shift) {
+                    // Check if keycode matches
+                    if event.keyCode == UInt16(shortcut.keyCode) {
+                        // Jump to the screen
+                        if index < self.screens.count {
+                            DispatchQueue.main.async {
+                                self.jumpCursorToScreen(self.screens[index])
+                            }
+                        }
                     }
                 }
             }
         }
-        
-        return noErr
     }
     
-    private func registerHotkey(for screenIndex: Int) {
-        var hotKeyID = EventHotKeyID()
-        hotKeyID.signature = 0x4A554D50 // 'JUMP' in hex
-        hotKeyID.id = UInt32(screenIndex)
-
-        var hotKeyRef: EventHotKeyRef?
-
-        // Get custom shortcut from ShortcutManager
-        let shortcut = ShortcutManager.shared.getShortcut(for: screenIndex)
-
-        // Use custom modifiers and keycode
-        let modifiers: UInt32 = shortcut.modifiers
-        let keyCode = UInt32(shortcut.keyCode)
-
-        // Register the hotkey
-        let status = RegisterEventHotKey(
-            keyCode,
-            modifiers,
-            hotKeyID,
-            GetApplicationEventTarget(),
-            0,
-            &hotKeyRef
-        )
-
-        if status == noErr {
-            hotkeyRefs.append(hotKeyRef)
-            
-            // Install event handler for this hotkey
-            var eventType = EventTypeSpec()
-            eventType.eventClass = UInt32(kEventClassKeyboard)
-            eventType.eventKind = UInt32(kEventHotKeyPressed)
-            
-            InstallApplicationEventHandler(
-                hotKeyFunction!,
-                1,
-                &eventType,
-                nil,
-                nil
-            )
-        } else {
-            print("Failed to register hotkey for screen \(screenIndex)")
-        }
-    }
-
     private func unregisterHotkeys() {
-        // Unregister all hotkeys
-        for hotKeyRef in hotkeyRefs {
-            if let hotKeyRef = hotKeyRef {
-                UnregisterEventHotKey(hotKeyRef)
-            }
-        }
-        hotkeyRefs.removeAll()
-        
-        // Dispose of the event handler UPP
-        if let hotKeyFunction = hotKeyFunction {
-            DisposeEventHandlerUPP(hotKeyFunction)
-            self.hotKeyFunction = nil
+        // Remove the global event monitor
+        if let eventHandler = eventHandler as? NSObjectProtocol {
+            NSEvent.removeMonitor(eventHandler)
+            self.eventHandler = nil
         }
     }
 }
