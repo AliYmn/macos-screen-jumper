@@ -112,17 +112,20 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             let screenName = getScreenName(screen)
             let resolution = getScreenResolution(screen)
             let icon = getScreenIcon(screen)
+            let screenType = getScreenType(screen)
 
             // Get custom shortcut from ShortcutManager
             let shortcut = ShortcutManager.shared.getShortcut(for: index)
 
+            // Format menu item with right-aligned shortcut
             let menuItem = NSMenuItem(
-                title: "\(screenName) (\(resolution)) - \(shortcut.description)",
+                title: "\(screenType) (\(resolution))",
                 action: #selector(jumpToScreen(_:)),
-                keyEquivalent: shortcut.keyEquivalent
+                keyEquivalent: index < 9 ? "\(index + 1)" : ""
             )
 
-            menuItem.keyEquivalentModifierMask = shortcut.modifierMask
+            // Set Command as the modifier
+            menuItem.keyEquivalentModifierMask = .command
             menuItem.tag = index
             menuItem.image = icon
             statusBarMenu.addItem(menuItem)
@@ -146,8 +149,61 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     public func getScreenName(_ screen: NSScreen) -> String {
-        let screenNumber = screens.firstIndex(of: screen) ?? 0
-        return "Screen \(screenNumber + 1)"
+        // Try to get a meaningful name
+        let name = screen.localizedName
+        if name.isEmpty {
+            let index = screens.firstIndex(of: screen) ?? 0
+            return "Screen \(index + 1)"
+        }
+        return name
+    }
+
+    private func getScreenType(_ screen: NSScreen) -> String {
+        let name = screen.localizedName.lowercased()
+        let width = screen.frame.width
+        let height = screen.frame.height
+        let aspectRatio = width / height
+
+        // Detect screen type based on name and dimensions
+        if name.contains("macbook") || name.contains("built-in") {
+            return "MacBook"
+        } else if name.contains("lg") && name.contains("ultrafine") {
+            return "LG UltraFine"
+        } else if name.contains("dell") {
+            if aspectRatio < 0.8 {
+                return "Dell Portrait"
+            } else {
+                return "Dell Monitor"
+            }
+        } else if aspectRatio < 0.8 {
+            return "Portrait Monitor"
+        } else if aspectRatio > 2.0 {
+            return "Ultrawide Monitor"
+        } else if min(width, height) < 900 && aspectRatio.rounded(to: 1) == 1.3 {
+            return "Tablet"
+        } else {
+            return "Monitor"
+        }
+    }
+
+    private func getScreenEmoji(_ screen: NSScreen) -> String {
+        let name = screen.localizedName.lowercased()
+        let width = screen.frame.width
+        let height = screen.frame.height
+        let aspectRatio = width / height
+
+        // Return appropriate emoji based on screen type
+        if name.contains("macbook") || name.contains("built-in") {
+            return "💻"
+        } else if aspectRatio < 0.8 {
+            return "🖥️"
+        } else if aspectRatio > 2.0 {
+            return "📺"
+        } else if min(width, height) < 900 && aspectRatio.rounded(to: 1) == 1.3 {
+            return "📱"
+        } else {
+            return "🖥️"
+        }
     }
 
     private func getScreenResolution(_ screen: NSScreen) -> String {
@@ -156,16 +212,31 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         return "\(width)×\(height)"
     }
 
+    private func getScreenIcon(_ screen: NSScreen) -> NSImage? {
+        let screenIndex = screens.firstIndex(of: screen) ?? 0
+        let iconName = getScreenIconName(for: screenIndex)
+        return NSImage(systemSymbolName: iconName, accessibilityDescription: "Display")
+    }
+
     public func getScreenIconName(for index: Int) -> String {
         if index < screens.count {
             let screen = screens[index]
             let width = screen.frame.width
             let height = screen.frame.height
             let aspectRatio = width / height
+            let name = screen.localizedName.lowercased()
 
-            // Logic based on TODO list
-            if screen.localizedName.lowercased().contains("built-in") {
+            // Enhanced logic for screen type detection
+            if name.contains("macbook") || name.contains("built-in") {
                 return "laptopcomputer"
+            } else if name.contains("lg") && name.contains("ultrafine") {
+                return "display.trianglebadge.exclamationmark"
+            } else if name.contains("dell") {
+                if aspectRatio < 0.8 {
+                    return "rectangle.portrait"
+                } else {
+                    return "display"
+                }
             } else if aspectRatio < 0.8 {
                 return "rectangle.portrait"
             } else if aspectRatio > 2.0 {
@@ -179,11 +250,6 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         return "display"
     }
 
-    private func getScreenIcon(_ screen: NSScreen) -> NSImage? {
-        let screenIndex = screens.firstIndex(of: screen) ?? 0
-        let iconName = getScreenIconName(for: screenIndex)
-        return NSImage(systemSymbolName: iconName, accessibilityDescription: "Display")
-    }
 
     @objc private func jumpToScreen(_ sender: NSMenuItem) {
         let screenIndex = sender.tag
