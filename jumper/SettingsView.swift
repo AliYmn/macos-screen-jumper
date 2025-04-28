@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var isRecordingShortcut = false
     @State private var recordingScreenIndex = -1
     @State private var keyboardMonitor: Any?
+    @State private var autoLaunch = LaunchAtLogin.shared.isEnabled()
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -21,19 +22,35 @@ struct SettingsView: View {
             VStack(spacing: 16) {
                 Toggle("Enable Sound Effect", isOn: $appDelegate.soundEffectEnabled)
                     .padding(.horizontal)
-
                 Toggle("Enable Visual Effect", isOn: $appDelegate.visualEffectEnabled)
                     .padding(.horizontal)
 
-                Toggle("Launch at Login", isOn: Binding(
-                    get: { LaunchAtLogin.shared.isEnabled() },
-                    set: { LaunchAtLogin.shared.setEnabled($0) }
-                ))
+                VStack {
+                    HStack {
+                        Spacer()
+                        Toggle("Start automatically when you log in", isOn: $autoLaunch)
+                            .onChange(of: autoLaunch) { newValue in
+                                LaunchAtLogin.shared.setEnabled(newValue)
+                            }
+                        Spacer()
+                    }
+                }
                 .padding(.horizontal)
 
                 Spacer()
             }
             .padding(.top, 20)
+            .onAppear {
+                NotificationCenter.default.addObserver(
+                    forName: LaunchAtLogin.statusChangedNotification,
+                    object: nil,
+                    queue: .main) { _ in
+                        self.autoLaunch = LaunchAtLogin.shared.isEnabled()
+                    }
+
+                // Force refresh the status when view appears
+                LaunchAtLogin.shared.refreshStatus()
+            }
             .tabItem {
                 Label("General", systemImage: "gear")
             }
@@ -100,16 +117,16 @@ struct SettingsView: View {
                 Text("Version 1.0")
                     .font(.title3)
                     .foregroundColor(.secondary)
-                
+
                 Text("A lightweight utility to jump your cursor between screens using keyboard shortcuts")
                     .font(.body)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
-                
+
                 Link("View on GitHub", destination: URL(string: "https://github.com/AliYmn/macos-jumper")!)
                     .buttonStyle(BorderlessButtonStyle())
                     .foregroundColor(.blue)
-                
+
                 Spacer()
 
                 Text("© 2025 Jumper App")

@@ -28,9 +28,12 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     // Pre-created sound object for sound effect
     private var popSound: NSSound?
-    
+
     // Settings window controller
     private var settingsWindowController: SettingsWindowController?
+
+    // User defaults keys
+    private let launchAtLoginPromptShownKey = "LaunchAtLoginPromptShown"
 
     // Store monitors for key events
     private var localMonitor: Any?
@@ -68,6 +71,14 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             object: nil
         )
 
+        // Listen for launch at login status changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(launchAtLoginStatusDidChange),
+            name: LaunchAtLogin.statusChangedNotification,
+            object: nil
+        )
+
         // Register keyboard shortcuts
         registerKeyboardShortcuts()
 
@@ -75,6 +86,9 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         DispatchQueue.main.async {
             self.setupMenuBar()
         }
+
+        // Ask for Launch at Login permission once
+        askForLaunchAtLoginPermission()
     }
 
     private func requestAccessibilityPermissions() {
@@ -114,28 +128,61 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @objc private func screensDidChange() {
         updateScreens()
     }
-    
+
     @objc private func shortcutsDidChange(_ notification: Notification) {
         // Apply shortcut changes
         updateMenuItems() // Update menu
+        unregisterKeyboardShortcuts()
         registerKeyboardShortcuts() // Re-register keyboard shortcuts
     }
-    
+
+    // Handle launch at login status changes
+    @objc private func launchAtLoginStatusDidChange() {
+        // Force UI update
+        DispatchQueue.main.async {
+            self.objectWillChange.send()
+        }
+    }
+
     @objc private func openSettings() {
         if settingsWindowController == nil {
             settingsWindowController = SettingsWindowController(appDelegate: self)
         }
-        
+
         settingsWindowController?.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
-    
+
     @objc private func refreshScreens() {
         updateScreens()
     }
-    
+
     @objc private func quitApp() {
         NSApp.terminate(nil)
+    }
+
+    // Ask for Launch at Login permission once when app is first launched
+    private func askForLaunchAtLoginPermission() {
+        let defaults = UserDefaults.standard
+
+        // Check if we've already shown the prompt
+        if !defaults.bool(forKey: launchAtLoginPromptShownKey) {
+            let alert = NSAlert()
+            alert.messageText = "Launch Jumper at Login?"
+            alert.informativeText = "Would you like Jumper to automatically start when you log in to your Mac?"
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "Yes")
+            alert.addButton(withTitle: "No")
+
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                // User chose Yes
+                LaunchAtLogin.shared.setEnabled(true)
+            }
+
+            // Mark that we've shown the prompt
+            defaults.set(true, forKey: launchAtLoginPromptShownKey)
+        }
     }
 
     public func updateScreens() {
@@ -300,7 +347,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             if popSound == nil {
                 popSound = NSSound(named: "Pop")
             }
-            
+
             // If sound is playing, stop it and restart
             if let sound = popSound {
                 if sound.isPlaying {
@@ -326,46 +373,46 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             self.globalMonitor = nil
         }
     }
-    
+
     private func registerKeyboardShortcuts() {
         // Remove any existing monitors
         unregisterKeyboardShortcuts()
-        
+
         // Create a global monitor for key events
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             _ = self?.handleKeyEvent(event)
         }
-        
+
         // Create a local monitor for key events (when app is active)
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             guard let self = self else { return event }
-            
+
             if self.handleKeyEvent(event) {
                 return nil // Consume the event
             }
-            
+
             return event // Pass the event through
         }
     }
-    
+
     private func handleKeyEvent(_ event: NSEvent) -> Bool {
         // Check if we have screens to jump to
         guard !screens.isEmpty else { return false }
-        
+
         // Check all screens
         for (index, screen) in screens.enumerated() {
             // Get the shortcut defined for this screen
             let shortcut = ShortcutManager.shared.getShortcut(for: index)
-            
+
             // Check if the shortcut keys and modifiers match
-            if event.keyCode == shortcut.keyCode && 
+            if event.keyCode == shortcut.keyCode &&
                event.modifierFlags.contains(shortcut.modifierMask) {
                 // Match found, move cursor to this screen
                 jumpCursorToScreen(screen)
                 return true
             }
         }
-        
+
         return false // Event was not handled
     }
 }
