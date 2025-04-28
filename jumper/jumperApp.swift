@@ -467,40 +467,13 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         unregisterKeyboardShortcuts()
         
         // Register app to receive keyboard events in the background
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        // Only check permissions, don't show alerts (already shown in requestAccessibilityPermissions)
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] // Don't show prompt automatically
         let accessEnabled = AXIsProcessTrustedWithOptions(options as CFDictionary)
         
+        // Just print debug information
         if !accessEnabled {
-            // Show a notification that accessibility permissions are needed
-            let center = UNUserNotificationCenter.current()
-            center.requestAuthorization(options: [.alert, .sound]) { granted, error in
-                if granted {
-                    DispatchQueue.main.async {
-                        let content = UNMutableNotificationContent()
-                        content.title = "Accessibility Permissions Required"
-                        content.body = "Jumper needs accessibility permissions to work globally."
-                        content.sound = UNNotificationSound.default
-                        
-                        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-                        center.add(request)
-                    }
-                }
-            }
-            
-            // Prompt user to enable accessibility
-            DispatchQueue.main.async {
-                let alert = NSAlert()
-                alert.messageText = "Accessibility Permissions Required"
-                alert.informativeText = "Jumper needs accessibility permissions to detect global shortcuts. Please enable in System Settings > Privacy & Security > Accessibility."
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: "Open Settings")
-                alert.addButton(withTitle: "Later")
-                
-                let response = alert.runModal()
-                if response == .alertFirstButtonReturn {
-                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
-                }
-            }
+            print("Accessibility permissions not granted. Global shortcuts may not work.")
         }
         
         // Create a global monitor for key events that works even when app isn't active
