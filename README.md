@@ -1,7 +1,7 @@
 # Jumper - macOS Menu Bar App
 
 <p align="center">
-  <img src="https://res.cloudinary.com/aliyaman/image/upload/v1745861313/cfmvyawq3ovad84cjsde.png" alt="Jumper Screenshot" />
+  <img src="https://res.cloudinary.com/aliyaman/image/upload/v1745861313/cfmvyawq3ovad84cjsde.png" alt="Jumper Screenshot" width="450" height="300" />
 </p>
 
 

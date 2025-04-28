@@ -296,81 +296,49 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     // MARK: - Global Hotkeys
     
-    // Create a global event handler for hotkeys
-    private var eventHandlerRef: EventHandlerRef? = nil
+    // Global event handler function
+    private var hotKeyFunction: EventHandlerUPP?
     
     private func registerHotkeys() {
         // First unregister any existing hotkeys
         unregisterHotkeys()
         
-        // Install a single event handler for all hotkeys
-        var eventType = EventTypeSpec()
-        eventType.eventClass = UInt32(kEventClassKeyboard)
-        eventType.eventKind = UInt32(kEventHotKeyPressed)
+        // Create a global event handler function
+        hotKeyFunction = NewEventHandlerUPP(hotKeyHandler)
         
-        // Install the event handler once
-        let status = InstallEventHandler(
-            GetApplicationEventTarget(),
-            { (nextHandler, theEvent, userData) -> OSStatus in
-                var hotKeyID = EventHotKeyID()
-                let status = GetEventParameter(
-                    theEvent,
-                    EventParamName(kEventParamDirectObject),
-                    EventParamType(typeEventHotKeyID),
-                    nil,
-                    MemoryLayout<EventHotKeyID>.size,
-                    nil,
-                    &hotKeyID
-                )
-                
-                if status == noErr && hotKeyID.signature == 0x4A554D50 { // 'JUMP' in hex
-                    let screenIndex = Int(hotKeyID.id)
-                    
-                    // Post a notification that will be handled on the main thread
-                    DispatchQueue.main.async {
-                        NotificationCenter.default.post(
-                            name: Notification.Name("JumperScreenJump"),
-                            object: nil,
-                            userInfo: ["screenIndex": screenIndex]
-                        )
-                    }
-                }
-                
-                return noErr
-            },
-            1,
-            &eventType,
-            nil,
-            &eventHandlerRef
-        )
-        
-        if status != noErr {
-            print("Failed to install event handler")
-            return
-        }
-        
-        // Register individual hotkeys
+        // Register hotkeys for each screen
         for (index, _) in screens.enumerated() {
             registerHotkey(for: index)
         }
-        
-        // Add observer for the jump notification
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleScreenJump(_:)),
-            name: Notification.Name("JumperScreenJump"),
-            object: nil
-        )
     }
     
-    @objc private func handleScreenJump(_ notification: Notification) {
-        guard let userInfo = notification.userInfo,
-              let screenIndex = userInfo["screenIndex"] as? Int,
-              screenIndex < screens.count else {
-            return
+    // C function for handling hotkey events
+    private func hotKeyHandler(_ nextHandler: EventHandlerCallRef?, _ theEvent: EventRef?, _ userData: UnsafeMutableRawPointer?) -> OSStatus {
+        var hotKeyID = EventHotKeyID()
+        let status = GetEventParameter(
+            theEvent,
+            EventParamName(kEventParamDirectObject),
+            EventParamType(typeEventHotKeyID),
+            nil,
+            MemoryLayout<EventHotKeyID>.size,
+            nil,
+            &hotKeyID
+        )
+        
+        if status == noErr && hotKeyID.signature == 0x4A554D50 { // 'JUMP' in hex
+            let screenIndex = Int(hotKeyID.id)
+            
+            // Use the main app delegate to handle the jump
+            if let appDelegate = NSApp.delegate as? AppDelegate {
+                DispatchQueue.main.async {
+                    if screenIndex < appDelegate.screens.count {
+                        appDelegate.jumpCursorToScreen(appDelegate.screens[screenIndex])
+                    }
+                }
+            }
         }
         
-        jumpCursorToScreen(screens[screenIndex])
+        return noErr
     }
     
     private func registerHotkey(for screenIndex: Int) {
@@ -399,15 +367,25 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
         if status == noErr {
             hotkeyRefs.append(hotKeyRef)
+            
+            // Install event handler for this hotkey
+            var eventType = EventTypeSpec()
+            eventType.eventClass = UInt32(kEventClassKeyboard)
+            eventType.eventKind = UInt32(kEventHotKeyPressed)
+            
+            InstallApplicationEventHandler(
+                hotKeyFunction!,
+                1,
+                &eventType,
+                nil,
+                nil
+            )
         } else {
             print("Failed to register hotkey for screen \(screenIndex)")
         }
     }
 
     private func unregisterHotkeys() {
-        // Remove notification observer
-        NotificationCenter.default.removeObserver(self, name: Notification.Name("JumperScreenJump"), object: nil)
-        
         // Unregister all hotkeys
         for hotKeyRef in hotkeyRefs {
             if let hotKeyRef = hotKeyRef {
@@ -416,10 +394,10 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
         hotkeyRefs.removeAll()
         
-        // Remove event handler
-        if let eventHandlerRef = eventHandlerRef {
-            RemoveEventHandler(eventHandlerRef)
-            self.eventHandlerRef = nil
+        // Dispose of the event handler UPP
+        if let hotKeyFunction = hotKeyFunction {
+            DisposeEventHandlerUPP(hotKeyFunction)
+            self.hotKeyFunction = nil
         }
     }
 }
