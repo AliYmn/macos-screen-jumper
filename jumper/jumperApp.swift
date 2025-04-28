@@ -338,8 +338,13 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         let centerX = screen.frame.origin.x + screen.frame.width / 2
         let centerY = screen.frame.origin.y + screen.frame.height / 2
 
-        // Move cursor directly (without visual effect)
+        // Move cursor directly
         CGWarpMouseCursorPosition(CGPoint(x: centerX, y: centerY))
+
+        // Show visual effect if enabled
+        if visualEffectEnabled {
+            showLightVisualEffect(at: CGPoint(x: centerX, y: centerY))
+        }
 
         // Play sound if enabled
         if soundEffectEnabled {
@@ -356,8 +361,87 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 sound.play()
             }
         }
+    }
 
-        // Visual effect disabled to prevent memory issues
+    // Show an elegant visual effect at the cursor position
+    private func showLightVisualEffect(at point: CGPoint) {
+        // Create outer ring
+        let ringSize: CGFloat = 50
+        let ringPanel = NSPanel(
+            contentRect: NSRect(x: point.x - ringSize/2, y: point.y - ringSize/2, width: ringSize, height: ringSize),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+
+        // Configure the ring panel
+        ringPanel.backgroundColor = .clear
+        ringPanel.isOpaque = false
+        ringPanel.hasShadow = false
+        ringPanel.level = .popUpMenu
+        ringPanel.ignoresMouseEvents = true
+
+        // Create a custom view for the ring
+        let ringView = NSView(frame: NSRect(x: 0, y: 0, width: ringSize, height: ringSize))
+        ringView.wantsLayer = true
+
+        // Create the ring shape
+        let ringLayer = CAShapeLayer()
+        let ringPath = NSBezierPath(ovalIn: NSRect(x: 2, y: 2, width: ringSize-4, height: ringSize-4))
+        ringLayer.path = ringPath.cgPath
+        ringLayer.fillColor = NSColor.clear.cgColor
+        ringLayer.strokeColor = NSColor.systemBlue.cgColor
+        ringLayer.lineWidth = 2.0
+        ringLayer.opacity = 0.7
+
+        // Add the ring layer
+        ringView.layer?.addSublayer(ringLayer)
+        ringPanel.contentView = ringView
+
+        // Create inner dot
+        let dotSize: CGFloat = 20
+        let dotPanel = NSPanel(
+            contentRect: NSRect(x: point.x - dotSize/2, y: point.y - dotSize/2, width: dotSize, height: dotSize),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+
+        // Configure the dot panel
+        dotPanel.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.4)
+        dotPanel.isOpaque = false
+        dotPanel.hasShadow = false
+        dotPanel.level = .popUpMenu
+        dotPanel.ignoresMouseEvents = true
+
+        // Make the dot round
+        dotPanel.contentView?.wantsLayer = true
+        dotPanel.contentView?.layer?.cornerRadius = dotSize/2
+
+        // Show both panels
+        ringPanel.orderFront(nil)
+        dotPanel.orderFront(nil)
+
+        // Simple fade-in effect
+        ringPanel.alphaValue = 0.0
+        dotPanel.alphaValue = 0.0
+
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.15
+            ringPanel.animator().alphaValue = 1.0
+            dotPanel.animator().alphaValue = 1.0
+        }) {
+            // Fade-out and close
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.15
+                ringPanel.animator().alphaValue = 0.0
+                dotPanel.animator().alphaValue = 0.0
+            }) {
+                // Close panels
+                ringPanel.close()
+                dotPanel.close()
+            }
+        }
     }
 
     private func unregisterKeyboardShortcuts() {
