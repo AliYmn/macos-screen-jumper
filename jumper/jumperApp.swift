@@ -211,7 +211,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
         // Add screens
         for (index, screen) in screens.enumerated() {
-            let screenName = getScreenName(screen)
+            // Get screen information
             let resolution = getScreenResolution(screen)
             let icon = getScreenIcon(screen)
             let screenType = getScreenType(screen)

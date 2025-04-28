@@ -29,7 +29,7 @@ struct SettingsView: View {
                     HStack {
                         Spacer()
                         Toggle("Start automatically when you log in", isOn: $autoLaunch)
-                            .onChange(of: autoLaunch) { newValue in
+                            .onChange(of: autoLaunch) { oldValue, newValue in
                                 LaunchAtLogin.shared.setEnabled(newValue)
                             }
                         Spacer()
@@ -147,7 +147,9 @@ struct SettingsView: View {
         }
         .onDisappear {
             recordingScreenIndex = -1
-            NSEvent.removeMonitor(keyboardMonitor)
+            if let monitor = keyboardMonitor {
+                NSEvent.removeMonitor(monitor)
+            }
         }
     }
 
