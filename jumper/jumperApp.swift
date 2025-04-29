@@ -156,7 +156,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         if !defaults.bool(forKey: permissionAlertShownKey) {
             let alert = NSAlert()
             alert.messageText = "Accessibility Permissions Required"
-            alert.informativeText = "Display Jumper needs accessibility permissions to move the cursor and respond to global keyboard shortcuts when other apps are active. This permission is only requested once.\n\nPlease enable in System Settings > Privacy & Security > Accessibility."
+            alert.informativeText = "Screen Jumper needs accessibility permissions to move the cursor and respond to global keyboard shortcuts when other apps are active. This permission is only requested once.\n\nPlease enable in System Settings > Privacy & Security > Accessibility."
             alert.alertStyle = .warning
             alert.addButton(withTitle: "Open Settings")
             alert.addButton(withTitle: "Later")
@@ -178,8 +178,8 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         if let button = statusItem.button {
             // Use a more visible icon for menu bar with standard dimensions
             let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .medium)
-            let menuIcon = NSImage(systemSymbolName: "cursorarrow.click.2", accessibilityDescription: "Jumper")?
-                .withSymbolConfiguration(config) ?? NSImage(systemSymbolName: "cursorarrow.rays", accessibilityDescription: "Jumper")!
+            let menuIcon = NSImage(systemSymbolName: "cursorarrow.click.2", accessibilityDescription: "Screen Jumper")?
+                .withSymbolConfiguration(config) ?? NSImage(systemSymbolName: "cursorarrow.rays", accessibilityDescription: "Screen Jumper")!
 
             // Ensure the icon has a standard size
             menuIcon.size = NSSize(width: 18, height: 18)
@@ -202,10 +202,16 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     @objc private func shortcutsDidChange(_ notification: Notification) {
+        // Temporarily pause keyboard monitoring
+        unregisterKeyboardShortcuts()
+
         // Apply shortcut changes
         updateMenuItems() // Update menu
-        unregisterKeyboardShortcuts()
-        registerKeyboardShortcuts() // Re-register keyboard shortcuts
+
+        // Re-register keyboard shortcuts after a short delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.registerKeyboardShortcuts()
+        }
     }
 
     // Handle launch at login status changes
@@ -263,8 +269,8 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // Check if we've already shown the prompt
         if !defaults.bool(forKey: launchAtLoginPromptShownKey) {
             let alert = NSAlert()
-            alert.messageText = "Launch Jumper at Login?"
-            alert.informativeText = "Would you like Jumper to automatically start when you log in to your Mac?"
+            alert.messageText = "Launch Screen Jumper at Login?"
+            alert.informativeText = "Would you like Screen Jumper to automatically start when you log in to your Mac?"
             alert.alertStyle = .informational
             alert.addButton(withTitle: "Yes")
             alert.addButton(withTitle: "No")
@@ -301,7 +307,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         statusBarMenu.removeAllItems()
 
         // Add header
-        let headerItem = NSMenuItem(title: "Jumper - Screen Selector", action: nil, keyEquivalent: "")
+        let headerItem = NSMenuItem(title: "Screen Jumper", action: nil, keyEquivalent: "")
         headerItem.isEnabled = false
         statusBarMenu.addItem(headerItem)
         statusBarMenu.addItem(NSMenuItem.separator())
@@ -343,7 +349,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         statusBarMenu.addItem(NSMenuItem.separator())
 
         // Quit
-        let quitItem = NSMenuItem(title: "Quit Jumper", action: #selector(quitApp), keyEquivalent: "")
+        let quitItem = NSMenuItem(title: "Quit Screen Jumper", action: #selector(quitApp), keyEquivalent: "")
         statusBarMenu.addItem(quitItem)
     }
 
@@ -747,7 +753,8 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     // Constants for keyboard shortcut handling
     private struct KeyboardShortcutConstants {
-        static let debugMode = false // Set to false for production
+        static let debugMode = false // Disable for production
+        static let controlShiftNumbersEnabled = true // Enable special handling for Control+Shift+Number
     }
 
     /**
@@ -808,44 +815,37 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
         // Extract key information from the event
         let keyCode = event.keyCode
+        let modifiers = event.modifierFlags.rawValue & NSEvent.ModifierFlags.deviceIndependentFlagsMask.rawValue
 
-        // IMPORTANT: For global shortcuts, we need to handle modifiers differently
-        // The raw value includes additional flags that we need to filter out
-        let rawModifiers = event.modifierFlags.rawValue
-        let deviceIndependentMask = NSEvent.ModifierFlags.deviceIndependentFlagsMask.rawValue
-        let modifiers = rawModifiers & deviceIndependentMask
+        // SPECIAL CASE: Control+Shift+Number (1-9) combinations
+        if event.modifierFlags.contains(.control) && event.modifierFlags.contains(.shift) {
+            // Number keys 1-9 correspond to keyCodes 18-26
+            if keyCode >= 18 && keyCode <= 26 {
+                let screenIndex = Int(keyCode) - 18 // Convert keyCode to 0-based index
 
-        // Additional mask to handle common modifier flag variations
-        let baseMask: UInt = 0xFFFF0000
-        let baseModifiers = rawModifiers & ~baseMask
+                if screenIndex < screens.count {
+                    // Jump to the corresponding screen
+                    let screen = screens[screenIndex]
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        self.jumpCursorToScreen(screen)
+                    }
+                    return true
+                }
+            }
+        }
 
-        // Debug info is disabled in production
-
-        // Check if the event matches any screen's shortcut
+        // Standard shortcut matching
         for (index, screen) in screens.enumerated() {
             let shortcut = ShortcutManager.shared.getShortcut(for: index)
 
-            // Try multiple matching strategies for better compatibility
-            let exactMatch = (keyCode == shortcut.keyCode && modifiers == shortcut.modifiers)
-            // Simplify the match to avoid type conversion issues
-            let baseMatch = (keyCode == shortcut.keyCode)
-
-            // For Control+Shift+Number shortcuts (common case)
-            let isControlShiftNumber =
-                (keyCode >= 18 && keyCode <= 29) && // Number keys 1-0
-                ((rawModifiers & UInt(NSEvent.ModifierFlags.control.rawValue)) != 0) &&
-                ((rawModifiers & UInt(NSEvent.ModifierFlags.shift.rawValue)) != 0)
-
-            // Check if this is a match
-            if exactMatch || baseMatch || (index < 10 && isControlShiftNumber && (keyCode - 18) == index) {
-                // Shortcut match found for this screen
-
-                // Found a match, jump to this screen on the main thread
+            if keyCode == shortcut.keyCode && modifiers == shortcut.modifiers {
+                // Jump to this screen
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
                     self.jumpCursorToScreen(screen)
                 }
-                return true // Event was handled
+                return true
             }
         }
 

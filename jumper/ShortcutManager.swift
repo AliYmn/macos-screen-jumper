@@ -2,7 +2,7 @@
 //  ShortcutManager.swift
 //  jumper
 //
-//  Created for Jumper app
+//  Created for Screen Jumper app
 //  Manages keyboard shortcuts for screen jumping functionality
 //
 
@@ -128,7 +128,7 @@ public struct KeyboardShortcut: Codable, Equatable {
 }
 
 /// Notification sent when shortcuts are changed
-public let shortcutsChangedNotification = Notification.Name("JumperShortcutsChanged")
+public let shortcutsChangedNotification = Notification.Name("ScreenJumperShortcutsChanged")
 
 /// Manages keyboard shortcuts for screen jumping functionality
 public final class ShortcutManager {
@@ -136,7 +136,7 @@ public final class ShortcutManager {
     public static let shared = ShortcutManager()
     
     /// UserDefaults key for storing shortcuts
-    private let userDefaultsKey = "JumperKeyboardShortcuts"
+    private let userDefaultsKey = "ScreenJumperKeyboardShortcuts"
     
     /// Dictionary mapping screen indices to their keyboard shortcuts
     private var shortcuts: [Int: KeyboardShortcut] = [:]

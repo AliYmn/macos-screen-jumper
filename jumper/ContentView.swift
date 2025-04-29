@@ -3,19 +3,19 @@
 //  jumper
 //
 //  Created by aliymnx on 28.04.2025
-//  Main content view for the Jumper application
+//  Main content view for the Screen Jumper application
 //
 
 import SwiftUI
 
-/// Main content view for the Jumper application settings
+/// Main content view for the Screen Jumper application settings
 struct ContentView: View {
     @EnvironmentObject var appDelegate: AppDelegate
     
     var body: some View {
         VStack(spacing: 20) {
             // Header
-            Text("Jumper Settings")
+            Text("Screen Jumper Settings")
                 .font(.title)
                 .fontWeight(.semibold)
                 .padding(.top)
@@ -26,7 +26,7 @@ struct ContentView: View {
             Spacer()
             
             // Footer with version
-            Text("Jumper v1.0")
+            Text("Screen Jumper v1.0")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }

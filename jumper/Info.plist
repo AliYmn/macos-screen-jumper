@@ -13,7 +13,7 @@
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>Display Jumper</string>
+    <string>Screen Jumper</string>
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
@@ -25,13 +25,13 @@
     <key>LSUIElement</key>
     <true/>
     <key>NSHumanReadableCopyright</key>
-    <string>Copyright © 2025 Jumper. All rights reserved.</string>
+    <string>Copyright © 2025 Screen Jumper. All rights reserved.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Display Jumper needs to control your computer to move the cursor between screens.</string>
+    <string>Screen Jumper needs to control your computer to move the cursor between screens.</string>
     <key>NSAccessibilityUsageDescription</key>
-    <string>Display Jumper needs accessibility permissions to detect keyboard shortcuts when other apps are active.</string>
+    <string>Screen Jumper needs accessibility permissions to detect keyboard shortcuts when other apps are active.</string>
     <key>NSAppleScriptEnabled</key>
     <true/>
     <key>LSApplicationCategoryType</key>

@@ -2,7 +2,7 @@
 //  SettingsView.swift
 //  jumper
 //
-//  Created for Jumper app
+//  Created for Screen Jumper app
 //
 
 import SwiftUI
@@ -34,16 +34,16 @@ struct SettingsView: View {
                                 Text("Visual Effects")
                                     .font(.headline)
                             }
-                            
+
                             Toggle("Enable visual effects when jumping", isOn: $appDelegate.visualEffectEnabled)
                                 .toggleStyle(SwitchToggleStyle())
                                 .padding(.leading, 5)
-                            
+
                             Text("Effect Style:")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                                 .padding(.leading, 5)
-                            
+
                             Picker("", selection: Binding<Int>(
                                 get: { appDelegate.visualEffectStyle.rawValue },
                                 set: { appDelegate.visualEffectStyle = AppDelegate.VisualEffectStyle(rawValue: $0) ?? .modern }
@@ -56,9 +56,9 @@ struct SettingsView: View {
                             .disabled(!appDelegate.visualEffectEnabled)
                             .padding(.leading, 5)
                         }
-                        
+
                         Divider()
-                        
+
                         // SOUND EFFECTS
                         VStack(alignment: .leading, spacing: 15) {
                             HStack {
@@ -68,16 +68,16 @@ struct SettingsView: View {
                                 Text("Sound Effects")
                                     .font(.headline)
                             }
-                            
+
                             Toggle("Enable sound effects when jumping", isOn: $appDelegate.soundEffectEnabled)
                                 .toggleStyle(SwitchToggleStyle())
                                 .padding(.leading, 5)
-                            
+
                             Text("Sound Type:")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                                 .padding(.leading, 5)
-                            
+
                             Picker("", selection: Binding<Int>(
                                 get: { appDelegate.selectedSoundEffect.rawValue },
                                 set: { appDelegate.selectedSoundEffect = AppDelegate.SoundEffectType(rawValue: $0) ?? .pop }
@@ -89,15 +89,15 @@ struct SettingsView: View {
                             .pickerStyle(SegmentedPickerStyle())
                             .disabled(!appDelegate.soundEffectEnabled)
                             .padding(.leading, 5)
-                            
+
                             HStack {
                                 Text("Volume:")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
-                                
+
                                 Slider(value: $appDelegate.soundVolume, in: 0...1)
                                     .disabled(!appDelegate.soundEffectEnabled)
-                                
+
                                 Text("\(Int(appDelegate.soundVolume * 100))%")
                                     .foregroundColor(.secondary)
                                     .font(.caption)
@@ -105,9 +105,9 @@ struct SettingsView: View {
                             }
                             .padding(.leading, 5)
                         }
-                        
+
                         Divider()
-                        
+
                         // SYSTEM SETTINGS
                         VStack(alignment: .leading, spacing: 15) {
                             HStack {
@@ -117,35 +117,36 @@ struct SettingsView: View {
                                 Text("System Settings")
                                     .font(.headline)
                             }
-                            
+
                             // Startup Option
-                            Toggle("Launch Jumper when you log in", isOn: $autoLaunch)
+                            Toggle("Launch Screen Jumper when you log in", isOn: $autoLaunch)
                                 .toggleStyle(SwitchToggleStyle())
                                 .onChange(of: autoLaunch) { oldValue, newValue in
                                     LaunchAtLogin.shared.setEnabled(newValue)
                                 }
                                 .padding(.leading, 5)
-                            
+
                             // Permissions
                             HStack {
-                                Text("Accessibility Permission:")
-                                    .font(.subheadline)
+                                Text("Accessibility Permission: ")
 
-                                Spacer()
-
-                                HStack(spacing: 5) {
-                                    if AXIsProcessTrusted() {
+                                if AXIsProcessTrusted() {
+                                    HStack(spacing: 5) {
                                         Image(systemName: "checkmark.circle.fill")
                                             .foregroundColor(.green)
                                         Text("Granted")
                                             .foregroundColor(.green)
-                                    } else {
+                                    }
+                                } else {
+                                    HStack(spacing: 5) {
                                         Image(systemName: "exclamationmark.triangle.fill")
                                             .foregroundColor(.red)
                                         Text("Not Granted")
                                             .foregroundColor(.red)
                                     }
                                 }
+
+                                Spacer()
                             }
                             .padding(.leading, 5)
 
@@ -250,7 +251,7 @@ struct SettingsView: View {
             VStack(spacing: 20) {
                 // App Name and Version
                 VStack(spacing: 8) {
-                    Text("Jumper")
+                    Text("Screen Jumper")
                         .font(.system(size: 32, weight: .bold, design: .rounded))
                         .foregroundColor(.primary)
 
@@ -288,7 +289,7 @@ struct SettingsView: View {
                 .padding(.bottom, 10)
 
                 // Copyright
-                Text("© \(Calendar.current.component(.year, from: Date())) Jumper App")
+                Text("© \(Calendar.current.component(.year, from: Date())) Screen Jumper App")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -395,7 +396,7 @@ class SettingsWindowController: NSWindowController {
             defer: false
         )
 
-        window.title = "Jumper Settings"
+        window.title = "Screen Jumper Settings"
         window.center()
 
         let hostingView = NSHostingView(rootView: SettingsView(appDelegate: appDelegate))

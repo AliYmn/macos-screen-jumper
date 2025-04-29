@@ -2,7 +2,7 @@
 //  LaunchAtLogin.swift
 //  jumper
 //
-//  Created for Jumper app
+//  Created for Screen Jumper app
 //  Manages launch at login functionality for the application
 //
 
