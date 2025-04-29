@@ -5,15 +5,15 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleExecutable</key>
-    <string>$(EXECUTABLE_NAME)</string>
+    <string>jumper</string>
     <key>CFBundleIconFile</key>
     <string></string>
     <key>CFBundleIdentifier</key>
-    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <string>aliymn.displayjumper</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>$(PRODUCT_NAME)</string>
+    <string>Display Jumper</string>
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
@@ -29,7 +29,9 @@
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Jumper needs to control your computer to move the cursor between screens.</string>
+    <string>Display Jumper needs to control your computer to move the cursor between screens.</string>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>Display Jumper needs accessibility permissions to detect keyboard shortcuts when other apps are active.</string>
     <key>NSAppleScriptEnabled</key>
     <true/>
     <key>LSApplicationCategoryType</key>

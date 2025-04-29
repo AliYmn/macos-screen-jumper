@@ -100,9 +100,6 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // Hide from Dock and register app to receive background events
         NSApp.setActivationPolicy(.accessory)
 
-        // Request accessibility permissions
-        requestAccessibilityPermissions()
-
         // Setup menu bar item
         setupMenuBar()
 
@@ -112,8 +109,22 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // Pre-create sound object
         popSound = NSSound(named: "Pop")
 
-        // Setup all notification observers
-        setupNotificationObservers()
+        // Register for screen configuration changes
+        NotificationCenter.default.addObserver(self, selector: #selector(screensDidChange), name: NSApplication.didChangeScreenParametersNotification, object: nil)
+
+        // Register for shortcut changes notification
+        NotificationCenter.default.addObserver(self, selector: #selector(shortcutsDidChange), name: shortcutsChangedNotification, object: nil)
+
+        // Register for Launch at Login status changes
+        NotificationCenter.default.addObserver(self, selector: #selector(launchAtLoginStatusDidChange), name: LaunchAtLogin.statusChangedNotification, object: nil)
+
+        // Request accessibility permissions immediately
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        let accessEnabled = AXIsProcessTrustedWithOptions(options as CFDictionary)
+
+        if !accessEnabled {
+            requestAccessibilityPermissions()
+        }
 
         // Register keyboard shortcuts
         registerKeyboardShortcuts()
@@ -123,18 +134,29 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             self.setupMenuBar()
         }
 
+        // Register keyboard shortcuts again after a delay to ensure they work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.registerKeyboardShortcuts()
+        }
+
+        // And one more time after a longer delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+            self?.registerKeyboardShortcuts()
+        }
+
         // Ask for Launch at Login permission once
         askForLaunchAtLoginPermission()
     }
 
     private func requestAccessibilityPermissions() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-        let accessEnabled = AXIsProcessTrustedWithOptions(options as CFDictionary)
+        // Store a flag to prevent showing this alert multiple times per session
+        let defaults = UserDefaults.standard
+        let permissionAlertShownKey = "accessibilityPermissionAlertShown"
 
-        if !accessEnabled {
+        if !defaults.bool(forKey: permissionAlertShownKey) {
             let alert = NSAlert()
             alert.messageText = "Accessibility Permissions Required"
-            alert.informativeText = "Jumper needs accessibility permissions to move the cursor and respond to global keyboard shortcuts. Please enable in System Settings > Privacy & Security > Accessibility."
+            alert.informativeText = "Display Jumper needs accessibility permissions to move the cursor and respond to global keyboard shortcuts when other apps are active. This permission is only requested once.\n\nPlease enable in System Settings > Privacy & Security > Accessibility."
             alert.alertStyle = .warning
             alert.addButton(withTitle: "Open Settings")
             alert.addButton(withTitle: "Later")
@@ -143,6 +165,9 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             if response == .alertFirstButtonReturn {
                 NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
             }
+
+            // Mark that we've shown the alert this session
+            defaults.set(true, forKey: permissionAlertShownKey)
         }
     }
 
@@ -210,7 +235,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     /**
      Sets up all notification observers needed by the application.
-     
+
      This includes observers for screen changes, shortcut changes, and launch at login status changes.
      */
     private func setupNotificationObservers() {
@@ -220,7 +245,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             (shortcutsChangedNotification, #selector(shortcutsDidChange)),
             (LaunchAtLogin.statusChangedNotification, #selector(launchAtLoginStatusDidChange))
         ]
-        
+
         // Register all observers
         for (name, selector) in observations {
             NotificationCenter.default.addObserver(
@@ -257,17 +282,17 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     /**
      Updates the list of available screens and refreshes related components.
-     
+
      This method is called whenever screen configuration changes, such as when
      monitors are connected or disconnected.
      */
     public func updateScreens() {
         // Update screens array - automatically detect all available monitors
         screens = NSScreen.screens
-        
+
         // Update menu to reflect the current screen configuration
         updateMenuItems()
-        
+
         // Re-register keyboard shortcuts to ensure they work with the new screen configuration
         registerKeyboardShortcuts()
     }
@@ -420,30 +445,30 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     /**
      Jumps the cursor to the center of the specified screen.
-     
+
      This method handles the coordinate conversion between Cocoa's coordinate system (origin at bottom-left)
      and Quartz's coordinate system (origin at top-left) to ensure accurate cursor positioning.
-     
+
      - Parameter screen: The NSScreen to jump the cursor to
      */
     private func jumpCursorToScreen(_ screen: NSScreen) {
         // Get the global screen coordinates
         let screenFrame = screen.frame
-        
+
         // Calculate center point in global coordinates
         let centerX = screenFrame.origin.x + screenFrame.width / 2
-        
+
         // Convert from Cocoa's coordinate system (origin at bottom-left) to
         // Quartz's coordinate system (origin at top-left) for CGWarpMouseCursorPosition
         let mainScreenHeight = NSScreen.screens.first?.frame.height ?? 0
         let flippedY = mainScreenHeight - (screenFrame.origin.y + screenFrame.height / 2)
-        
+
         // Create the center point in global coordinates
         let centerPoint = CGPoint(x: centerX, y: flippedY)
-        
+
         // Move cursor to the center of the screen
         CGWarpMouseCursorPosition(centerPoint)
-        
+
         // Show visual effect at the exact cursor position if enabled
         if visualEffectEnabled {
             // Small delay to ensure cursor has moved before showing effect
@@ -536,39 +561,39 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     /**
      Shows a visual effect at the specified point when the cursor jumps.
-     
+
      Creates a non-interactive panel with animated layers to provide visual feedback
      at the exact location where the cursor has jumped to.
-     
+
      - Parameter point: The point where the visual effect should be displayed
      */
     private func showLightVisualEffect(at point: CGPoint) {
         let constants = VisualEffectConstants.self
         let highlightSize = constants.highlightSize
-        
+
         // Create and configure the panel
         let highlightPanel = createVisualEffectPanel(at: point, size: highlightSize)
-        
+
         // Create a custom view for the highlight
         let highlightView = NSView(frame: NSRect(x: 0, y: 0, width: highlightSize, height: highlightSize))
         highlightView.wantsLayer = true
-        
+
         // Create and add all layers
         let (glowLayer, ringLayer, innerRingLayer, dotLayer) = createVisualEffectLayers(size: highlightSize)
-        
+
         // Add layers in the correct order for proper rendering
         highlightView.layer?.addSublayer(glowLayer)
         highlightView.layer?.addSublayer(ringLayer)
         highlightView.layer?.addSublayer(innerRingLayer)
         highlightView.layer?.addSublayer(dotLayer)
         highlightPanel.contentView = highlightView
-        
+
         // Show the panel
         highlightPanel.orderFront(nil)
-        
+
         // Add animations
         addAnimationsToLayers(ringLayer: ringLayer, innerRingLayer: innerRingLayer, dotLayer: dotLayer)
-        
+
         // Handle panel fade-in/out and cleanup
         animatePanelVisibility(panel: highlightPanel)
     }
@@ -722,56 +747,99 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     // Constants for keyboard shortcut handling
     private struct KeyboardShortcutConstants {
-        static let debugMode = false // Set to false in production to disable debug prints
+        static let debugMode = false // Set to false for production
     }
 
     /**
      Registers keyboard shortcuts for screen jumping functionality.
-     
+
      Sets up both local and global event monitors to capture keyboard shortcuts
      regardless of which application is active.
      */
     private func registerKeyboardShortcuts() {
         // Remove any existing monitors first to prevent duplicates
         unregisterKeyboardShortcuts()
-        
+
+        // Check accessibility permissions without showing system dialog
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false]
+        let accessEnabled = AXIsProcessTrustedWithOptions(options as CFDictionary)
+
+        if !accessEnabled {
+            // Show our custom permission dialog only once after a short delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.requestAccessibilityPermissions()
+            }
+        }
+
         // Set up local event monitor for keyboard shortcuts when app is active
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             guard let self = self else { return event }
-            
+
             if self.handleKeyEvent(event) {
                 return nil // Event was handled, don't propagate
             }
             return event // Event wasn't handled, propagate normally
         }
-        
+
         // Set up global event monitor for keyboard shortcuts when app is in background
+        // Note: Global monitor only works properly when accessibility permissions are granted
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             guard let self = self else { return }
             _ = self.handleKeyEvent(event) // Just handle the event
+        }
+
+        // Force accessibility permissions dialog if needed
+        if !accessEnabled {
+            // This will show the system dialog
+            let forceOptions = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+            _ = AXIsProcessTrustedWithOptions(forceOptions as CFDictionary)
         }
     }
 
     /**
      Handles keyboard events and determines if they match any registered shortcuts.
-     
+
      - Parameter event: The NSEvent to process
      - Returns: Boolean indicating whether the event was handled
      */
     private func handleKeyEvent(_ event: NSEvent) -> Bool {
         // Check if we have screens to jump to
         guard !screens.isEmpty else { return false }
-        
+
         // Extract key information from the event
         let keyCode = event.keyCode
-        let modifiers = event.modifierFlags.rawValue & NSEvent.ModifierFlags.deviceIndependentFlagsMask.rawValue
-        
+
+        // IMPORTANT: For global shortcuts, we need to handle modifiers differently
+        // The raw value includes additional flags that we need to filter out
+        let rawModifiers = event.modifierFlags.rawValue
+        let deviceIndependentMask = NSEvent.ModifierFlags.deviceIndependentFlagsMask.rawValue
+        let modifiers = rawModifiers & deviceIndependentMask
+
+        // Additional mask to handle common modifier flag variations
+        let baseMask: UInt = 0xFFFF0000
+        let baseModifiers = rawModifiers & ~baseMask
+
+        // Debug info is disabled in production
+
         // Check if the event matches any screen's shortcut
         for (index, screen) in screens.enumerated() {
             let shortcut = ShortcutManager.shared.getShortcut(for: index)
-            
-            // Check if the pressed key matches this screen's shortcut
-            if keyCode == shortcut.keyCode && modifiers == shortcut.modifiers {
+
+            // Try multiple matching strategies for better compatibility
+            let exactMatch = (keyCode == shortcut.keyCode && modifiers == shortcut.modifiers)
+            // Simplify the match to avoid type conversion issues
+            let baseMatch = (keyCode == shortcut.keyCode)
+
+            // For Control+Shift+Number shortcuts (common case)
+            let isControlShiftNumber =
+                (keyCode >= 18 && keyCode <= 29) && // Number keys 1-0
+                ((rawModifiers & UInt(NSEvent.ModifierFlags.control.rawValue)) != 0) &&
+                ((rawModifiers & UInt(NSEvent.ModifierFlags.shift.rawValue)) != 0)
+
+            // Check if this is a match
+            if exactMatch || baseMatch || (index < 10 && isControlShiftNumber && (keyCode - 18) == index) {
+                // Shortcut match found for this screen
+
                 // Found a match, jump to this screen on the main thread
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
@@ -780,7 +848,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 return true // Event was handled
             }
         }
-        
+
         return false // No matching shortcut found
     }
 }
