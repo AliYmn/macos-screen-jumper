@@ -152,8 +152,8 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         if let button = statusItem.button {
             // Use a more visible icon for menu bar
             let config = NSImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
-            let menuIcon = NSImage(systemSymbolName: "cursorarrow.click.2", accessibilityDescription: "Jumper")?.
-                withSymbolConfiguration(config) ?? NSImage(systemSymbolName: "cursorarrow.rays", accessibilityDescription: "Jumper")!
+            let menuIcon = NSImage(systemSymbolName: "cursorarrow.click.2", accessibilityDescription: "Jumper")?
+                .withSymbolConfiguration(config) ?? NSImage(systemSymbolName: "cursorarrow.rays", accessibilityDescription: "Jumper")!
 
             // Set the icon
             button.image = menuIcon
@@ -257,7 +257,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     public func updateScreens() {
-        // Update screens array
+        // Update screens array - automatically detect all available monitors
         screens = NSScreen.screens
 
         // Update menu
@@ -405,16 +405,35 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     private func jumpCursorToScreen(_ screen: NSScreen) {
-        // Calculate center point of screen
-        let centerX = screen.frame.origin.x + screen.frame.width / 2
-        let centerY = screen.frame.origin.y + screen.frame.height / 2
+        // Get the global screen coordinates
+        let screenFrame = screen.frame
+
+        // Calculate true center point in global coordinates
+        // Note: In macOS, the origin (0,0) is at the bottom-left corner of the main screen
+        // and Y coordinates increase upward
+        let centerX = screenFrame.origin.x + screenFrame.width / 2
+
+        // Convert from Cocoa's coordinate system (origin at bottom-left) to
+        // Quartz's coordinate system (origin at top-left) for CGWarpMouseCursorPosition
+        // Get the main screen height for the conversion
+        let mainScreenHeight = NSScreen.screens.first?.frame.height ?? 0
+        let flippedY = mainScreenHeight - (screenFrame.origin.y + screenFrame.height / 2)
+
+        // Create the center point in global coordinates
+        let centerPoint = CGPoint(x: centerX, y: flippedY)
+
+        // Cursor will jump to the center of the screen in global coordinates
 
         // Move cursor directly
-        CGWarpMouseCursorPosition(CGPoint(x: centerX, y: centerY))
+        CGWarpMouseCursorPosition(centerPoint)
 
-        // Show visual effect if enabled
+        // Show visual effect if enabled - using the exact same position as the cursor
         if visualEffectEnabled {
-            showLightVisualEffect(at: CGPoint(x: centerX, y: centerY))
+            // Small delay to ensure cursor has moved before showing effect
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                let currentMouseLocation = NSEvent.mouseLocation
+                self.showLightVisualEffect(at: currentMouseLocation)
+            }
         }
 
         // Play sound if enabled
