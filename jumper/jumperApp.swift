@@ -150,18 +150,20 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem.button {
-            // Use a more visible icon for menu bar
-            let config = NSImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+            // Use a more visible icon for menu bar with standard dimensions
+            let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .medium)
             let menuIcon = NSImage(systemSymbolName: "cursorarrow.click.2", accessibilityDescription: "Jumper")?
                 .withSymbolConfiguration(config) ?? NSImage(systemSymbolName: "cursorarrow.rays", accessibilityDescription: "Jumper")!
+
+            // Ensure the icon has a standard size
+            menuIcon.size = NSSize(width: 18, height: 18)
 
             // Set the icon
             button.image = menuIcon
 
-            // Increase the button size to accommodate the icon
-            button.frame = NSRect(x: button.frame.origin.x, y: button.frame.origin.y,
-                                 width: button.frame.width + 8, height: button.frame.height)
+            // Set proper spacing and alignment
             button.imagePosition = .imageLeft
+            button.imageHugsTitle = true
         }
 
         statusBarMenu = NSMenu()
@@ -361,7 +363,17 @@ public class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private func getScreenIcon(_ screen: NSScreen) -> NSImage? {
         let screenIndex = screens.firstIndex(of: screen) ?? 0
         let iconName = getScreenIconName(for: screenIndex)
-        return NSImage(systemSymbolName: iconName, accessibilityDescription: "Display")
+
+        // Create a properly sized icon with standard menu item dimensions
+        let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+        let icon = NSImage(systemSymbolName: iconName, accessibilityDescription: "Display")?.withSymbolConfiguration(config)
+
+        // Ensure the icon has a standard size for menu items
+        if let icon = icon {
+            icon.size = NSSize(width: 18, height: 18)
+        }
+
+        return icon
     }
 
     public func getScreenIconName(for index: Int) -> String {
