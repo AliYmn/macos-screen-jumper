@@ -3,25 +3,39 @@
 //  jumper
 //
 //  Created for Jumper app
+//  Manages keyboard shortcuts for screen jumping functionality
 //
 
 import Foundation
 import AppKit
 
+/// Represents a keyboard shortcut with key code and modifier flags
 public struct KeyboardShortcut: Codable, Equatable {
+    /// The key code of the shortcut key
     public var keyCode: Int
+    
+    /// Bit flags representing modifier keys (Control, Shift, Option, Command)
     public var modifiers: UInt32
-
+    
+    /// Creates a new keyboard shortcut
+    /// - Parameters:
+    ///   - keyCode: The key code of the shortcut key
+    ///   - modifiers: Bit flags for modifier keys
     public init(keyCode: Int, modifiers: UInt32) {
         self.keyCode = keyCode
         self.modifiers = modifiers
     }
+    
+    /// Default modifier combination: Control (1) + Shift (2) = 3
+    public static let defaultModifiers: UInt32 = 3
 
-    public static let defaultModifiers: UInt32 = 3 // Control (1) + Shift (2)
-
+    /// Creates a default shortcut for the given screen index
+    /// - Parameter screenIndex: The index of the screen (0-based)
+    /// - Returns: A keyboard shortcut using Control+Shift+Number (1-9)
     public static func defaultShortcut(for screenIndex: Int) -> KeyboardShortcut {
         // Default to Control+Shift+Number (1-9)
-        let keyCode = 0x12 + screenIndex // 0x12 is kVK_ANSI_1
+        // 0x12 is kVK_ANSI_1, so we add the screen index to get keys 1-9
+        let keyCode = 0x12 + min(screenIndex, 8) // Limit to 9 screens (1-9)
         return KeyboardShortcut(keyCode: keyCode, modifiers: defaultModifiers)
     }
 
@@ -113,41 +127,50 @@ public struct KeyboardShortcut: Codable, Equatable {
     }
 }
 
-// Notification name for shortcut changes
+/// Notification sent when shortcuts are changed
 public let shortcutsChangedNotification = Notification.Name("JumperShortcutsChanged")
 
-public class ShortcutManager {
+/// Manages keyboard shortcuts for screen jumping functionality
+public final class ShortcutManager {
+    /// Shared singleton instance
     public static let shared = ShortcutManager()
-
+    
+    /// UserDefaults key for storing shortcuts
     private let userDefaultsKey = "JumperKeyboardShortcuts"
+    
+    /// Dictionary mapping screen indices to their keyboard shortcuts
     private var shortcuts: [Int: KeyboardShortcut] = [:]
-
-    // Cache for frequently accessed shortcuts to improve performance
+    
+    /// Cache for frequently accessed shortcuts to improve performance
     private var shortcutCache: [Int: KeyboardShortcut] = [:]
-
+    
+    /// Private initializer to enforce singleton pattern
     private init() {
         loadShortcuts()
     }
 
+    /// Gets the keyboard shortcut for a specific screen index
+    /// - Parameter screenIndex: The index of the screen
+    /// - Returns: The keyboard shortcut for the specified screen
     public func getShortcut(for screenIndex: Int) -> KeyboardShortcut {
         // First check the cache for better performance
         if let cachedShortcut = shortcutCache[screenIndex] {
             return cachedShortcut
         }
-
+        
         // If not in cache, check the main shortcuts dictionary
         if let shortcut = shortcuts[screenIndex] {
             // Store in cache for future access
             shortcutCache[screenIndex] = shortcut
             return shortcut
-        } else {
-            // Create default shortcut if none exists
-            let defaultShortcut = KeyboardShortcut.defaultShortcut(for: screenIndex)
-            shortcuts[screenIndex] = defaultShortcut
-            shortcutCache[screenIndex] = defaultShortcut
-            saveShortcuts()
-            return defaultShortcut
-        }
+        } 
+        
+        // Create default shortcut if none exists
+        let defaultShortcut = KeyboardShortcut.defaultShortcut(for: screenIndex)
+        shortcuts[screenIndex] = defaultShortcut
+        shortcutCache[screenIndex] = defaultShortcut
+        saveShortcuts()
+        return defaultShortcut
     }
 
     public func setShortcut(_ shortcut: KeyboardShortcut, for screenIndex: Int) {
@@ -196,16 +219,26 @@ public class ShortcutManager {
         NotificationCenter.default.post(name: shortcutsChangedNotification, object: nil)
     }
 
+    /// Loads saved shortcuts from UserDefaults
     private func loadShortcuts() {
-        if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
-           let savedShortcuts = try? JSONDecoder().decode([Int: KeyboardShortcut].self, from: data) {
-            shortcuts = savedShortcuts
+        guard let data = UserDefaults.standard.data(forKey: userDefaultsKey) else { return }
+        
+        do {
+            shortcuts = try JSONDecoder().decode([Int: KeyboardShortcut].self, from: data)
+            // Pre-populate cache with loaded shortcuts for better performance
+            shortcutCache = shortcuts
+        } catch {
+            print("Error loading shortcuts: \(error)")
         }
     }
-
+    
+    /// Saves shortcuts to UserDefaults
     private func saveShortcuts() {
-        if let data = try? JSONEncoder().encode(shortcuts) {
+        do {
+            let data = try JSONEncoder().encode(shortcuts)
             UserDefaults.standard.set(data, forKey: userDefaultsKey)
+        } catch {
+            print("Error saving shortcuts: \(error)")
         }
     }
 }
